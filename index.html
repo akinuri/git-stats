@@ -79,6 +79,34 @@
 			</div>
 			<div id="emptyState" class="py-10 text-base text-slate-700 pl-2">Paste a dump or upload a file to render the commit table.</div>
 		</section>
+
+		<section class="mt-6 rounded bg-white p-4 shadow sm:p-5">
+			<div class="flex items-center justify-between gap-3">
+				<h2 class="text-lg text-slate-900">Daily Contributions</h2>
+				<div id="contributionSummary" class="text-sm text-slate-600"></div>
+			</div>
+			<div id="contributionGraphEmpty" class="mt-4 text-slate-700">Parse a dump to see daily activity.</div>
+			<div id="contributionGraphWrap" class="mt-4 hidden">
+				<div class="overflow-x-auto">
+					<div class="min-w-max pb-1">
+						<div class="grid grid-cols-[auto_1fr] grid-rows-[auto_auto] gap-x-2">
+							<div></div>
+							<div id="contributionMonths" class="mb-1 h-4 grid gap-2 pl-0.5 text-[11px] text-slate-500"></div>
+							<div class="grid grid-rows-7 auto-rows-[0.75rem] gap-1 text-[11px] leading-3 text-slate-500">
+								<div class="flex h-3 items-center">Mon</div>
+								<div class="flex h-3 items-center">Tue</div>
+								<div class="flex h-3 items-center">Wed</div>
+								<div class="flex h-3 items-center">Thu</div>
+								<div class="flex h-3 items-center">Fri</div>
+								<div class="flex h-3 items-center">Sat</div>
+								<div class="flex h-3 items-center">Sun</div>
+							</div>
+							<div id="contributionGrid" class="grid grid-rows-7 grid-flow-col auto-cols-max auto-rows-[0.75rem] gap-2"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
 	</main>
 
 	<script>
@@ -89,6 +117,11 @@
 		const tableWrap = document.getElementById('tableWrap');
 		const commitTableBody = document.getElementById('commitTableBody');
 		const emptyState = document.getElementById('emptyState');
+		const contributionSummary = document.getElementById('contributionSummary');
+		const contributionGraphEmpty = document.getElementById('contributionGraphEmpty');
+		const contributionGraphWrap = document.getElementById('contributionGraphWrap');
+		const contributionMonths = document.getElementById('contributionMonths');
+		const contributionGrid = document.getElementById('contributionGrid');
 		const parser = globalThis.GitStatsUtils || {};
 		const {
 			parseGitDump: parseGitDumpUtil,
@@ -177,12 +210,174 @@
 			emptyState.classList.add('hidden');
 		}
 
+		function toDayKey(dateText) {
+			const text = String(dateText || '').trim();
+			const isoDayMatch = text.match(/\d{4}-\d{2}-\d{2}/);
+
+			if (isoDayMatch) {
+				return isoDayMatch[0];
+			}
+
+			const parsed = new Date(text);
+			if (Number.isNaN(parsed.getTime())) {
+				return '';
+			}
+
+			const year = parsed.getUTCFullYear();
+			const month = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+			const day = String(parsed.getUTCDate()).padStart(2, '0');
+			return `${year}-${month}-${day}`;
+		}
+
+		function parseDayKey(dayKey) {
+			const date = new Date(`${dayKey}T00:00:00Z`);
+			return Number.isNaN(date.getTime()) ? null : date;
+		}
+
+		function formatDayLabel(dayKey) {
+			const date = parseDayKey(dayKey);
+			if (!date) {
+				return dayKey;
+			}
+
+			return date.toLocaleDateString(undefined, {
+				year: 'numeric',
+				month: 'short',
+				day: 'numeric',
+				weekday: 'short',
+			});
+		}
+
+		function startOfWeek(date) {
+			const copy = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+			const day = copy.getUTCDay();
+			const mondayOffset = (day + 6) % 7;
+			copy.setUTCDate(copy.getUTCDate() - mondayOffset);
+			return copy;
+		}
+
+		function levelClass(count, maxCount) {
+			if (!count) {
+				return 'bg-slate-100 border-slate-200';
+			}
+
+			if (maxCount <= 1) {
+				return 'bg-emerald-300 border-emerald-300';
+			}
+
+			const ratio = count / maxCount;
+			if (ratio <= 0.25) {
+				return 'bg-emerald-100 border-emerald-200';
+			}
+			if (ratio <= 0.5) {
+				return 'bg-emerald-300 border-emerald-300';
+			}
+			if (ratio <= 0.75) {
+				return 'bg-emerald-500 border-emerald-500';
+			}
+
+			return 'bg-emerald-700 border-emerald-700';
+		}
+
+		function renderContributionGraph(data) {
+			const dayCounts = new Map();
+			for (const commit of data) {
+				const dayKey = toDayKey(commit.author_date || commit.committer_date);
+				if (!dayKey) {
+					continue;
+				}
+
+				dayCounts.set(dayKey, (dayCounts.get(dayKey) || 0) + 1);
+			}
+
+			if (!dayCounts.size) {
+				contributionSummary.textContent = '';
+				contributionMonths.innerHTML = '';
+				contributionGrid.innerHTML = '';
+				contributionGraphWrap.classList.add('hidden');
+				contributionGraphEmpty.classList.remove('hidden');
+				return;
+			}
+
+			const sortedDayKeys = Array.from(dayCounts.keys()).sort();
+			const firstDate = parseDayKey(sortedDayKeys[0]);
+			const lastDate = parseDayKey(sortedDayKeys[sortedDayKeys.length - 1]);
+			if (!firstDate || !lastDate) {
+				contributionSummary.textContent = '';
+				contributionMonths.innerHTML = '';
+				contributionGrid.innerHTML = '';
+				contributionGraphWrap.classList.add('hidden');
+				contributionGraphEmpty.classList.remove('hidden');
+				return;
+			}
+
+			const firstWeekStart = startOfWeek(firstDate);
+			const lastWeekStart = startOfWeek(lastDate);
+			const totalDays = Math.round((lastWeekStart - firstWeekStart) / 86400000) + 7;
+			const totalWeeks = Math.ceil(totalDays / 7);
+			const maxCount = Math.max(...dayCounts.values());
+
+			const totalContributions = Array.from(dayCounts.values()).reduce((sum, count) => sum + count, 0);
+			contributionSummary.textContent = `${totalContributions} contribution${totalContributions === 1 ? '' : 's'} across ${dayCounts.size} day${dayCounts.size === 1 ? '' : 's'}`;
+
+			const weekColumnTemplate = `repeat(${totalWeeks}, minmax(0, 0.75rem))`;
+			contributionMonths.style.gridTemplateColumns = weekColumnTemplate;
+			contributionGrid.style.gridTemplateColumns = weekColumnTemplate;
+
+			const monthStartColumns = new Map();
+			const monthTitles = new Map();
+			for (let weekIndex = 0; weekIndex < totalWeeks; weekIndex += 1) {
+				const daysPerMonth = new Map();
+				for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+					const day = new Date(firstWeekStart);
+					day.setUTCDate(day.getUTCDate() + (weekIndex * 7) + dayIndex);
+					const monthKey = `${day.getUTCFullYear()}-${String(day.getUTCMonth() + 1).padStart(2, '0')}`;
+					daysPerMonth.set(monthKey, (daysPerMonth.get(monthKey) || 0) + 1);
+					if (!monthTitles.has(monthKey)) {
+						monthTitles.set(monthKey, day.toLocaleDateString(undefined, { month: 'short' }));
+					}
+				}
+
+				for (const [monthKey, dayCount] of daysPerMonth.entries()) {
+					if (dayCount >= 4 && !monthStartColumns.has(monthKey)) {
+						monthStartColumns.set(monthKey, weekIndex + 1);
+					}
+				}
+			}
+
+			const monthLabels = Array.from(monthStartColumns.entries())
+				.sort((a, b) => a[1] - b[1])
+				.map(([monthKey, startColumn]) => {
+					const monthTitle = monthTitles.get(monthKey) || '';
+					return `<div class="text-left" style="grid-column: ${startColumn} / span 4;">${escapeHtmlUtil(monthTitle)}</div>`;
+				});
+
+			const cells = [];
+			for (let weekIndex = 0; weekIndex < totalWeeks; weekIndex += 1) {
+				for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+					const current = new Date(firstWeekStart);
+					current.setUTCDate(current.getUTCDate() + (weekIndex * 7) + dayIndex);
+					const dayKey = `${current.getUTCFullYear()}-${String(current.getUTCMonth() + 1).padStart(2, '0')}-${String(current.getUTCDate()).padStart(2, '0')}`;
+					const count = dayCounts.get(dayKey) || 0;
+					cells.push(
+						`<div class="h-4 w-4 rounded-sm border ${levelClass(count, maxCount)}" title="${count} contribution${count === 1 ? '' : 's'} on ${escapeHtmlUtil(formatDayLabel(dayKey))}"></div>`,
+					);
+				}
+			}
+
+			contributionMonths.innerHTML = monthLabels.join('');
+			contributionGrid.innerHTML = cells.join('');
+			contributionGraphEmpty.classList.add('hidden');
+			contributionGraphWrap.classList.remove('hidden');
+		}
+
 		function parseCurrentInput() {
 			const text = dumpInput.value.trim();
 
 			if (!text) {
 				commits = [];
 				renderRows([]);
+				renderContributionGraph([]);
 				return;
 			}
 
@@ -193,6 +388,7 @@
 			const parsed = parseGitDumpUtil(text);
 			commits = Array.isArray(parsed.commits) ? parsed.commits : [];
 			renderRows(commits);
+			renderContributionGraph(commits);
 		}
 
 		dumpFile.addEventListener('change', async () => {
@@ -210,9 +406,11 @@
 			dumpInput.value = '';
 			commits = [];
 			renderRows([]);
+			renderContributionGraph([]);
 		});
 
 		renderRows([]);
+		renderContributionGraph([]);
 	</script>
 </body>
 </html>
