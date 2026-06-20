@@ -39,20 +39,24 @@
 			<h1 class="text-3xl">Git Stats</h1>
 		</header>
 
-		<section class="mt-6 space-y-4">
-			<div class="space-y-2">
-				<label class="block text-base" for="dumpFile">Upload dump file</label>
-				<input id="dumpFile" type="file" accept=".txt,.log,.dump,text/plain" class="block w-full rounded border border-slate-400 bg-white px-3 py-2 text-base">
-			</div>
+		<section class="mt-4 rounded bg-white p-4 shadow sm:p-5">
+			<div class="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start lg:gap-5">
+				<div class="space-y-6">
+					<div class="space-y-1">
+						<label class="block text-sm text-slate-700" for="dumpFile">Upload dump file</label>
+						<input id="dumpFile" type="file" accept=".txt,.log,.dump,text/plain" class="block w-full rounded border border-slate-400 bg-white px-3 py-1.5 text-sm">
+					</div>
 
-			<div class="space-y-2">
-				<label class="block text-base" for="dumpInput">Paste dump text</label>
-				<textarea id="dumpInput" rows="5" spellcheck="false" placeholder="@@COMMIT@@ ..." class="block w-full rounded border border-slate-400 bg-white px-3 py-2 font-mono text-base"></textarea>
-			</div>
+					<div class="flex flex-wrap gap-2">
+						<button id="parseButton" class="rounded border border-slate-800 bg-slate-800 px-4 py-1.5 text-sm text-white hover:bg-slate-700">Parse dump</button>
+						<button id="clearButton" class="rounded border border-slate-400 bg-white px-4 py-1.5 text-sm hover:bg-slate-200">Clear</button>
+					</div>
+				</div>
 
-			<div class="flex flex-wrap gap-2">
-				<button id="parseButton" class="rounded border border-slate-800 bg-slate-800 px-4 py-2 text-base text-white hover:bg-slate-700">Parse dump</button>
-				<button id="clearButton" class="rounded border border-slate-400 bg-white px-4 py-2 text-base hover:bg-slate-200">Clear</button>
+				<div class="space-y-1">
+					<label class="block text-sm text-slate-700" for="dumpInput">Paste dump text</label>
+					<textarea id="dumpInput" rows="4" spellcheck="false" placeholder="@@COMMIT@@ ..." class="block w-full rounded border border-slate-400 bg-white px-3 py-1.5 font-mono text-sm"></textarea>
+				</div>
 			</div>
 		</section>
 
