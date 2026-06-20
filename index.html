@@ -130,6 +130,7 @@
 			}
 
 			const rows = data.map((commit, index) => {
+				const rowNumber = data.length - index;
 				const shortParents = commit.parents.map((parent) => shortHashUtil(parent)).join(' ');
 				const summaryInsertions = commit.files.reduce((sum, file) => sum + (file.insertions || 0), 0);
 				const summaryDeletions = commit.files.reduce((sum, file) => sum + (file.deletions || 0), 0);
@@ -137,7 +138,7 @@
 
 				return `
 					<tr class="align-top hover:bg-slate-50">
-						<td class="whitespace-nowrap px-4 py-2 text-slate-900">${index + 1}</td>
+						<td class="whitespace-nowrap px-4 py-2 text-slate-900">${rowNumber}</td>
 						<td class="whitespace-nowrap px-4 py-2 font-mono text-base text-slate-900" title="${escapeHtmlUtil(commit.hash || '')}">${escapeHtmlUtil(shortHashUtil(commit.hash))}</td>
 						<td class="whitespace-nowrap px-4 py-2 font-mono text-base text-slate-900" title="${escapeHtmlUtil(commit.parents.join(' '))}">${shortParents ? escapeHtmlUtil(shortParents) : '<span class="text-slate-900">-</span>'}</td>
 						<td class="px-4 py-2 text-slate-900">
