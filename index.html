@@ -56,31 +56,7 @@
 			</div>
 		</section>
 
-		<section class="mt-6 rounded bg-white shadow">
-			<div id="tableWrap" class="overflow-auto rounded border border-slate-200">
-				<table class="min-w-full divide-y divide-slate-200 text-left text-base">
-					<thead class="sticky top-0 z-10 bg-slate-200/75 text-slate-800 backdrop-blur-sm">
-						<tr>
-							<th class="px-4 py-3">#</th>
-							<th class="px-4 py-3">Hash</th>
-							<th class="px-4 py-3">Parents</th>
-							<th class="px-4 py-3">Author</th>
-							<th class="px-4 py-3">Author date</th>
-							<th class="px-4 py-3">Committer</th>
-							<th class="px-4 py-3">Committer date</th>
-							<th class="px-4 py-3">Subject</th>
-							<th class="px-4 py-3">Body</th>
-							<th class="px-4 py-3">Changes</th>
-							<th class="px-4 py-3">Files</th>
-						</tr>
-					</thead>
-					<tbody id="commitTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
-				</table>
-			</div>
-			<div id="emptyState" class="py-10 text-base text-slate-700 pl-2">Paste a dump or upload a file to render the commit table.</div>
-		</section>
-
-		<section class="mt-6 rounded bg-white p-4 shadow sm:p-5">
+		<section class="mt-12 rounded bg-white p-4 shadow sm:p-5">
 			<div class="flex items-center justify-between gap-3">
 				<h2 class="text-lg text-slate-900">Daily Contributions</h2>
 				<div id="contributionSummary" class="text-sm text-slate-600"></div>
@@ -107,6 +83,30 @@
 					</div>
 				</div>
 			</div>
+		</section>
+
+		<section class="mt-12 rounded bg-white shadow">
+			<div id="tableWrap" class="overflow-auto rounded border border-slate-200">
+				<table class="min-w-full divide-y divide-slate-200 text-left text-base">
+					<thead class="sticky top-0 z-10 bg-slate-200/75 text-slate-800 backdrop-blur-sm">
+						<tr>
+							<th class="px-4 py-3">#</th>
+							<th class="px-4 py-3">Hash</th>
+							<th class="px-4 py-3">Parents</th>
+							<th class="px-4 py-3">Author</th>
+							<th class="px-4 py-3">Author date</th>
+							<th class="px-4 py-3">Committer</th>
+							<th class="px-4 py-3">Committer date</th>
+							<th class="px-4 py-3">Subject</th>
+							<th class="px-4 py-3">Body</th>
+							<th class="px-4 py-3">Changes</th>
+							<th class="px-4 py-3">Files</th>
+						</tr>
+					</thead>
+					<tbody id="commitTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+				</table>
+			</div>
+			<div id="emptyState" class="py-10 text-base text-slate-700 pl-4">Paste a dump or upload a file to render the commit table.</div>
 		</section>
 	</main>
 
