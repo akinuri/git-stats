@@ -89,6 +89,17 @@
 			</div>
 		</section>
 
+		<section class="mt-12 rounded bg-white p-4 shadow sm:p-5">
+			<div class="flex items-center justify-between gap-3">
+				<h2 class="text-lg text-slate-900">Author Activity</h2>
+				<div id="authorSummary" class="text-sm text-slate-600"></div>
+			</div>
+			<div id="authorSummaryEmpty" class="mt-4 text-slate-700">Parse a dump to see author totals.</div>
+			<div id="authorSummaryWrap" class="mt-4 hidden">
+				<div id="authorSummaryBody" class="flex flex-wrap gap-4"></div>
+			</div>
+		</section>
+
 		<section class="mt-12 rounded bg-white shadow">
 			<div id="tableWrap" class="overflow-auto rounded border border-slate-200">
 				<table class="min-w-full divide-y divide-slate-200 text-left text-base">
@@ -127,6 +138,10 @@
 		const contributionGraphWrap = document.getElementById('contributionGraphWrap');
 		const contributionMonths = document.getElementById('contributionMonths');
 		const contributionGrid = document.getElementById('contributionGrid');
+		const authorSummary = document.getElementById('authorSummary');
+		const authorSummaryEmpty = document.getElementById('authorSummaryEmpty');
+		const authorSummaryWrap = document.getElementById('authorSummaryWrap');
+		const authorSummaryBody = document.getElementById('authorSummaryBody');
 		const parser = globalThis.GitStatsUtils || {};
 		const {
 			parseGitDump: parseGitDumpUtil,
@@ -213,6 +228,90 @@
 			commitTableBody.innerHTML = rows;
 			setTableHeight(true);
 			emptyState.classList.add('hidden');
+		}
+
+		function renderAuthorSummary(data) {
+			if (!data.length) {
+				authorSummary.textContent = '';
+				authorSummaryBody.innerHTML = '';
+				authorSummaryWrap.classList.add('hidden');
+				authorSummaryEmpty.classList.remove('hidden');
+				return;
+			}
+
+			const authorMap = new Map();
+
+			for (const commit of data) {
+				const authorName = String(commit.author_name || '').trim() || 'Unknown author';
+				const authorEmail = String(commit.author_email || '').trim();
+				const authorKey = `${authorName} <${authorEmail}>`;
+				const files = Array.isArray(commit.files) ? commit.files : [];
+				const insertions = files.reduce((sum, file) => sum + (file.insertions || 0), 0);
+				const deletions = files.reduce((sum, file) => sum + (file.deletions || 0), 0);
+				const current = authorMap.get(authorKey) || {
+					name: authorName,
+					email: authorEmail,
+					commits: 0,
+					insertions: 0,
+					deletions: 0,
+					files: 0,
+				};
+
+				current.commits += 1;
+				current.insertions += insertions;
+				current.deletions += deletions;
+				current.files += files.length;
+				authorMap.set(authorKey, current);
+			}
+
+			const authors = Array.from(authorMap.values())
+				.map((author) => ({
+					...author,
+					changes: author.insertions + author.deletions,
+				}))
+				.sort((left, right) => right.changes - left.changes || right.commits - left.commits || left.name.localeCompare(right.name));
+
+			const totalCommits = authors.reduce((sum, author) => sum + author.commits, 0);
+			const totalChanges = authors.reduce((sum, author) => sum + author.changes, 0);
+
+			authorSummary.textContent = `${authors.length} author${authors.length === 1 ? '' : 's'} across ${totalCommits} commit${totalCommits === 1 ? '' : 's'} and ${totalChanges} change${totalChanges === 1 ? '' : 's'}`;
+
+			authorSummaryBody.innerHTML = authors.map((author) => {
+				const authorLabel = escapeHtmlUtil(author.name);
+				const authorEmail = author.email ? `<div class="text-slate-500">${escapeHtmlUtil(author.email)}</div>` : '';
+				return `
+					<div class="flex-none rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
+						<div class="flex items-start justify-between gap-2">
+							<div>
+								<div class="text-sm font-semibold text-slate-900">${authorLabel}</div>
+								<div class="text-xs text-slate-500">${author.email ? escapeHtmlUtil(author.email) : ''}</div>
+							</div>
+							<div class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-black/75">${author.commits} commit${author.commits === 1 ? '' : 's'}</div>
+						</div>
+						<div class="mt-2 grid grid-cols-2 gap-1.5 text-xs">
+							<div class="rounded-lg bg-white px-2 py-1.5">
+								<div class="uppercase tracking-wide text-slate-500">Changes</div>
+								<div class="font-semibold text-slate-900">${author.changes}</div>
+							</div>
+							<div class="rounded-lg bg-white px-2 py-1.5">
+								<div class="uppercase tracking-wide text-slate-500">Files</div>
+								<div class="font-semibold text-slate-900">${author.files}</div>
+							</div>
+							<div class="rounded-lg bg-emerald-50 px-2 py-1.5 text-emerald-700">
+								<div class="uppercase tracking-wide text-emerald-600">Insertions</div>
+								<div class="font-semibold">+${author.insertions}</div>
+							</div>
+							<div class="rounded-lg bg-rose-50 px-2 py-1.5 text-rose-700">
+								<div class="uppercase tracking-wide text-rose-600">Deletions</div>
+								<div class="font-semibold">-${author.deletions}</div>
+							</div>
+						</div>
+					</div>
+				`;
+			}).join('');
+
+			authorSummaryWrap.classList.remove('hidden');
+			authorSummaryEmpty.classList.add('hidden');
 		}
 
 		function toDayKey(dateText) {
@@ -416,6 +515,7 @@
 			commits = Array.isArray(parsed.commits) ? parsed.commits : [];
 			renderRows(commits);
 			renderContributionGraph(commits);
+			renderAuthorSummary(commits);
 		}
 
 		dumpFile.addEventListener('change', async () => {
@@ -434,10 +534,12 @@
 			commits = [];
 			renderRows([]);
 			renderContributionGraph([]);
+			renderAuthorSummary([]);
 		});
 
 		renderRows([]);
 		renderContributionGraph([]);
+		renderAuthorSummary([]);
 	</script>
 </body>
 </html>
