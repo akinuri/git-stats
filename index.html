@@ -289,12 +289,12 @@
 					<div class="flex-none rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
 						<div class="flex items-start justify-between gap-2">
 							<div>
-								<div class="text-sm font-semibold text-slate-900">${authorLabel}</div>
-								<div class="text-xs text-slate-500">${author.email ? escapeHtmlUtil(author.email) : ''}</div>
+								<div class="font-semibold text-slate-900">${authorLabel}</div>
+								<div class="text-slate-500">${author.email ? escapeHtmlUtil(author.email) : ''}</div>
 							</div>
-							<div class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-black/75">${author.commits} commit${author.commits === 1 ? '' : 's'}</div>
+							<div class="rounded-full bg-slate-200 px-2 py-0.5 font-semibold text-black/75">${author.commits} commit${author.commits === 1 ? '' : 's'}</div>
 						</div>
-						<div class="mt-2 grid grid-cols-2 gap-1.5 text-xs">
+						<div class="mt-2 grid grid-cols-2 gap-1.5">
 							<div class="rounded-lg bg-white px-2 py-1.5">
 								<div class="uppercase tracking-wide text-slate-500">Changes</div>
 								<div class="font-semibold text-slate-900">${author.changes}</div>
