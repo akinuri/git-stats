@@ -52,6 +52,11 @@
 						<span>Ignore merge commits</span>
 					</label>
 
+					<label class="flex items-center gap-2 text-sm text-slate-700" for="ignoreFirstCommit">
+						<input id="ignoreFirstCommit" type="checkbox" checked class="h-4 w-4 rounded border-slate-400 text-slate-800 focus:ring-slate-400">
+						<span>Ignore first commit</span>
+					</label>
+
 					<div class="flex flex-wrap gap-2">
 						<button id="parseButton" class="rounded border border-slate-800 bg-slate-800 px-4 py-1.5 text-sm text-white hover:bg-slate-700">Parse dump</button>
 						<button id="clearButton" class="rounded border border-slate-400 bg-white px-4 py-1.5 text-sm hover:bg-slate-200">Clear</button>
@@ -134,6 +139,7 @@
 		const dumpFile = document.getElementById('dumpFile');
 		const dumpInput = document.getElementById('dumpInput');
 		const ignoreMergeCommits = document.getElementById('ignoreMergeCommits');
+		const ignoreFirstCommit = document.getElementById('ignoreFirstCommit');
 		const parseButton = document.getElementById('parseButton');
 		const clearButton = document.getElementById('clearButton');
 		const tableWrap = document.getElementById('tableWrap');
@@ -326,12 +332,23 @@
 			return parents.length > 1 || /^Merge pull request #\d+ from /i.test(subject);
 		}
 
-		function getVisibleCommits(data) {
-			if (!ignoreMergeCommits.checked) {
-				return data;
-			}
+		function isFirstCommit(commit) {
+			const parents = Array.isArray(commit.parents) ? commit.parents.filter(Boolean) : [];
+			return parents.length === 0;
+		}
 
-			return data.filter((commit) => !isMergeCommit(commit));
+		function getVisibleCommits(data) {
+			return data.filter((commit) => {
+				if (ignoreMergeCommits.checked && isMergeCommit(commit)) {
+					return false;
+				}
+
+				if (ignoreFirstCommit.checked && isFirstCommit(commit)) {
+					return false;
+				}
+
+				return true;
+			});
 		}
 
 		function toDayKey(dateText) {
@@ -551,6 +568,7 @@
 
 		parseButton.addEventListener('click', parseCurrentInput);
 		ignoreMergeCommits.addEventListener('change', parseCurrentInput);
+		ignoreFirstCommit.addEventListener('change', parseCurrentInput);
 		clearButton.addEventListener('click', () => {
 			dumpFile.value = '';
 			dumpInput.value = '';
