@@ -71,7 +71,7 @@
 					<div class="min-w-max pb-1">
 						<div class="grid grid-cols-[auto_1fr] grid-rows-[auto_auto] gap-x-2">
 							<div></div>
-							<div id="contributionMonths" class="mb-1 h-4 grid gap-2 pl-0.5 text-[11px] text-slate-500"></div>
+							<div id="contributionMonths" class="mb-1 h-4 grid gap-x-1 pl-0.5 text-[11px] text-slate-500"></div>
 							<div class="grid grid-rows-8 auto-rows-[0.75rem] gap-1 text-[11px] leading-3 text-slate-500">
 								<div class="flex h-3 items-center">Mon</div>
 								<div class="flex h-3 items-center">Tue</div>
@@ -82,7 +82,7 @@
 								<div class="flex h-3 items-center">Sun</div>
 								<div class="text-[10px] text-slate-400"></div>
 							</div>
-							<div id="contributionGrid" class="grid grid-rows-8 grid-flow-col auto-cols-max auto-rows-[0.75rem] gap-x-2 gap-y-0"></div>
+							<div id="contributionGrid" class="grid grid-rows-8 grid-flow-col auto-cols-max auto-rows-[0.75rem] gap-1"></div>
 						</div>
 					</div>
 				</div>
@@ -325,9 +325,10 @@
 			const totalContributions = Array.from(dayCounts.values()).reduce((sum, count) => sum + count, 0);
 			contributionSummary.textContent = `${totalContributions} contribution${totalContributions === 1 ? '' : 's'} across ${dayCounts.size} day${dayCounts.size === 1 ? '' : 's'}`;
 
-			const weekColumnTemplate = `repeat(${totalWeeks}, minmax(0, 0.75rem))`;
+			const weekColumnTemplate = `repeat(${totalWeeks}, 1rem)`;
 			contributionMonths.style.gridTemplateColumns = weekColumnTemplate;
 			contributionGrid.style.gridTemplateColumns = weekColumnTemplate;
+			contributionGrid.style.gridTemplateRows = 'repeat(7, 1rem) 1.5rem';
 
 			const monthStartColumns = new Map();
 			const monthTitles = new Map();
@@ -354,7 +355,7 @@
 				.sort((a, b) => a[1] - b[1])
 				.map(([monthKey, startColumn]) => {
 					const monthTitle = monthTitles.get(monthKey) || '';
-					return `<div class="text-left" style="grid-column: ${startColumn} / span 4;">${escapeHtmlUtil(monthTitle)}</div>`;
+					return `<div class="text-left" style="grid-column: ${startColumn} / span 4; grid-row: 1;">${escapeHtmlUtil(monthTitle)}</div>`;
 				});
 
 			const cells = [];
