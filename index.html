@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Git Stats</title>
+	<script src="https://cdn.tailwindcss.com"></script>
+	<script src="./utils.js"></script>
+	<script>
+		tailwind.config = {
+			theme: {
+				extend: {
+					fontFamily: {
+						sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+					},
+					colors: {
+						ink: {
+							50: '#f8fafc',
+							100: '#f1f5f9',
+							200: '#e2e8f0',
+							300: '#cbd5e1',
+							400: '#94a3b8',
+							500: '#64748b',
+							600: '#475569',
+							700: '#334155',
+							800: '#1e293b',
+							900: '#0f172a',
+						},
+					},
+				},
+			},
+		};
+	</script>
+</head>
+
+<body class="min-h-screen bg-slate-100/50 pb-24 font-sans text-base text-slate-900 antialiased sm:pb-32">
+	<main class="flex h-full w-full flex-col px-4 py-6 pb-24 sm:px-6 sm:pb-32 lg:px-8">
+		<header class="space-y-3">
+			<h1 class="text-3xl">Git Stats</h1>
+		</header>
+
+		<section class="mt-6 space-y-4">
+			<div class="space-y-2">
+				<label class="block text-base" for="dumpFile">Upload dump file</label>
+				<input id="dumpFile" type="file" accept=".txt,.log,.dump,text/plain" class="block w-full rounded border border-slate-400 bg-white px-3 py-2 text-base">
+			</div>
+
+			<div class="space-y-2">
+				<label class="block text-base" for="dumpInput">Paste dump text</label>
+				<textarea id="dumpInput" rows="5" spellcheck="false" placeholder="@@COMMIT@@ ..." class="block w-full rounded border border-slate-400 bg-white px-3 py-2 font-mono text-base"></textarea>
+			</div>
+
+			<div class="flex flex-wrap gap-2">
+				<button id="parseButton" class="rounded border border-slate-800 bg-slate-800 px-4 py-2 text-base text-white hover:bg-slate-700">Parse dump</button>
+				<button id="clearButton" class="rounded border border-slate-400 bg-white px-4 py-2 text-base hover:bg-slate-200">Clear</button>
+			</div>
+		</section>
+
+		<section class="mt-6 rounded bg-white shadow">
+			<div id="tableWrap" class="overflow-auto rounded border border-slate-200">
+				<table class="min-w-full divide-y divide-slate-200 text-left text-base">
+					<thead class="sticky top-0 z-10 bg-slate-200/75 text-slate-800 backdrop-blur-sm">
+						<tr>
+							<th class="px-4 py-3">#</th>
+							<th class="px-4 py-3">Hash</th>
+							<th class="px-4 py-3">Parents</th>
+							<th class="px-4 py-3">Author</th>
+							<th class="px-4 py-3">Author date</th>
+							<th class="px-4 py-3">Committer</th>
+							<th class="px-4 py-3">Committer date</th>
+							<th class="px-4 py-3">Subject</th>
+							<th class="px-4 py-3">Body</th>
+							<th class="px-4 py-3">Changes</th>
+							<th class="px-4 py-3">Files</th>
+						</tr>
+					</thead>
+					<tbody id="commitTableBody" class="divide-y divide-slate-100 bg-white"></tbody>
+				</table>
+			</div>
+			<div id="emptyState" class="py-10 text-base text-slate-700 pl-2">Paste a dump or upload a file to render the commit table.</div>
+		</section>
+	</main>
+
+	<script>
+		const dumpFile = document.getElementById('dumpFile');
+		const dumpInput = document.getElementById('dumpInput');
+		const parseButton = document.getElementById('parseButton');
+		const clearButton = document.getElementById('clearButton');
+		const tableWrap = document.getElementById('tableWrap');
+		const commitTableBody = document.getElementById('commitTableBody');
+		const emptyState = document.getElementById('emptyState');
+		const parser = globalThis.GitStatsUtils || {};
+		const {
+			parseGitDump: parseGitDumpUtil,
+			escapeHtml: escapeHtmlUtil,
+			shortHash: shortHashUtil,
+		} = parser;
+
+		let commits = [];
+
+		function setTableHeight(hasRows) {
+			tableWrap.style.height = hasRows ? '70vh' : 'auto';
+		}
+
+		function renderFiles(files) {
+			if (!files.length) {
+				return '<span class="text-slate-900">No file changes</span>';
+			}
+
+			return `
+				<div class="space-y-2 text-base">
+					${files.map((file) => `
+						<div class="whitespace-nowrap">
+							<span class="text-slate-900">${escapeHtmlUtil(file.path || '')}</span>
+							<span class="ml-2 text-emerald-600">+${file.insertions ?? '∅'}</span>
+							<span class="text-slate-900"> / </span>
+							<span class="text-rose-600">-${file.deletions ?? '∅'}</span>
+						</div>
+					`).join('')}
+				</div>
+			`;
+		}
+
+		function renderRows(data) {
+			if (!data.length) {
+				commitTableBody.innerHTML = '';
+				setTableHeight(false);
+				emptyState.classList.remove('hidden');
+				return;
+			}
+
+			const rows = data.map((commit, index) => {
+				const shortParents = commit.parents.map((parent) => shortHashUtil(parent)).join(' ');
+				const summaryInsertions = commit.files.reduce((sum, file) => sum + (file.insertions || 0), 0);
+				const summaryDeletions = commit.files.reduce((sum, file) => sum + (file.deletions || 0), 0);
+				const sameAuthorAndCommitterDate = commit.author_date === commit.committer_date;
+
+				return `
+					<tr class="align-top hover:bg-slate-50">
+						<td class="whitespace-nowrap px-4 py-4 text-slate-900">${index + 1}</td>
+						<td class="whitespace-nowrap px-4 py-4 font-mono text-base text-slate-900" title="${escapeHtmlUtil(commit.hash || '')}">${escapeHtmlUtil(shortHashUtil(commit.hash))}</td>
+						<td class="whitespace-nowrap px-4 py-4 font-mono text-base text-slate-900" title="${escapeHtmlUtil(commit.parents.join(' '))}">${shortParents ? escapeHtmlUtil(shortParents) : '<span class="text-slate-900">-</span>'}</td>
+						<td class="px-4 py-4 text-slate-900">
+							<div class="font-semibold text-slate-900">${escapeHtmlUtil(commit.author_name || '')}</div>
+							<div class="text-base text-slate-500">${escapeHtmlUtil(commit.author_email || '')}</div>
+						</td>
+						<td class="whitespace-nowrap px-4 py-4 font-mono text-base text-slate-900">${escapeHtmlUtil(commit.author_date || '')}</td>
+						<td class="px-4 py-4 text-slate-900">
+							<div class="font-semibold text-slate-900">${escapeHtmlUtil(commit.committer_name || '')}</div>
+							<div class="text-base text-slate-500">${escapeHtmlUtil(commit.committer_email || '')}</div>
+						</td>
+						<td class="whitespace-nowrap px-4 py-4 font-mono text-base ${sameAuthorAndCommitterDate ? 'text-slate-300' : 'text-slate-900'}">${escapeHtmlUtil(commit.committer_date || '')}</td>
+						<td class="px-4 py-4 text-slate-900">
+							<div class="max-w-md whitespace-normal text-slate-900">${escapeHtmlUtil(commit.subject || '')}</div>
+						</td>
+						<td class="px-4 py-4 text-slate-900">
+							<pre class="max-w-lg whitespace-pre-wrap break-words text-base leading-6 text-slate-700">${commit.body ? escapeHtmlUtil(commit.body) : '<span class="text-slate-300">(empty)</span>'}</pre>
+						</td>
+						<td class="px-4 py-4 text-slate-900">
+							<div class="text-slate-900 whitespace-nowrap">
+								<span>${commit.files.length} file${commit.files.length === 1 ? '' : 's'}</span>
+								<span class="ml-2 text-emerald-600">+${summaryInsertions}</span>
+								<span class="text-slate-900"> / </span>
+								<span class="text-rose-600">-${summaryDeletions}</span>
+							</div>
+						</td>
+						<td class="px-4 py-4 text-slate-900">
+							${renderFiles(commit.files)}
+						</td>
+					</tr>
+				`;
+			}).join('');
+
+			commitTableBody.innerHTML = rows;
+			setTableHeight(true);
+			emptyState.classList.add('hidden');
+		}
+
+		function parseCurrentInput() {
+			const text = dumpInput.value.trim();
+
+			if (!text) {
+				commits = [];
+				renderRows([]);
+				return;
+			}
+
+			if (typeof parseGitDumpUtil !== 'function') {
+				return;
+			}
+
+			const parsed = parseGitDumpUtil(text);
+			commits = Array.isArray(parsed.commits) ? parsed.commits : [];
+			renderRows(commits);
+		}
+
+		dumpFile.addEventListener('change', async () => {
+			const file = dumpFile.files && dumpFile.files[0];
+			if (!file) {
+				return;
+			}
+
+			dumpInput.value = await file.text();
+		});
+
+		parseButton.addEventListener('click', parseCurrentInput);
+		clearButton.addEventListener('click', () => {
+			dumpFile.value = '';
+			dumpInput.value = '';
+			commits = [];
+			renderRows([]);
+		});
+
+		renderRows([]);
+	</script>
+</body>
+</html>
