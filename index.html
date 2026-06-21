@@ -71,6 +71,31 @@
 		</section>
 
 		<section class="mt-12 rounded bg-white p-4 shadow sm:p-5">
+			<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+				<div>
+					<h2 class="text-lg text-slate-900">Filters</h2>
+					<p class="mt-1 text-sm text-slate-600">Refine the parsed results without changing the raw dump text.</p>
+				</div>
+				<div class="w-full max-w-md">
+					<label class="block text-sm text-slate-700" for="authorFilterButton">Author</label>
+					<div id="authorFilter" class="relative mt-1">
+						<button id="authorFilterButton" type="button" aria-haspopup="listbox" aria-expanded="false" class="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus:border-slate-500 focus:outline-none">
+							<span id="authorFilterLabel" class="truncate">All authors</span>
+							<span class="ml-3 text-slate-500">▾</span>
+						</button>
+						<div id="authorFilterMenu" class="absolute left-0 right-0 z-20 mt-2 hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+							<div class="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+								<div id="authorFilterCount" class="text-xs text-slate-500">No authors loaded</div>
+								<button id="authorFilterClear" type="button" class="text-xs font-medium text-slate-600 hover:text-slate-900">Clear</button>
+							</div>
+							<div id="authorFilterOptions" class="max-h-64 space-y-1 overflow-y-auto pr-1"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section class="mt-12 rounded bg-white p-4 shadow sm:p-5">
 			<div class="flex items-center justify-between gap-3">
 				<h2 class="text-lg text-slate-900">Daily Contributions</h2>
 				<div id="contributionSummary" class="text-sm text-slate-600"></div>
@@ -150,6 +175,13 @@
 		const contributionGraphWrap = document.getElementById('contributionGraphWrap');
 		const contributionMonths = document.getElementById('contributionMonths');
 		const contributionGrid = document.getElementById('contributionGrid');
+		const authorFilter = document.getElementById('authorFilter');
+		const authorFilterButton = document.getElementById('authorFilterButton');
+		const authorFilterLabel = document.getElementById('authorFilterLabel');
+		const authorFilterMenu = document.getElementById('authorFilterMenu');
+		const authorFilterCount = document.getElementById('authorFilterCount');
+		const authorFilterOptions = document.getElementById('authorFilterOptions');
+		const authorFilterClear = document.getElementById('authorFilterClear');
 		const authorSummary = document.getElementById('authorSummary');
 		const authorSummaryEmpty = document.getElementById('authorSummaryEmpty');
 		const authorSummaryWrap = document.getElementById('authorSummaryWrap');
@@ -162,6 +194,90 @@
 		} = parser;
 
 		let commits = [];
+		let selectedAuthors = new Set();
+
+		function getAuthorKey(authorName, authorEmail) {
+			const normalizedName = String(authorName || '').trim() || 'Unknown author';
+			const normalizedEmail = String(authorEmail || '').trim();
+			return `${normalizedName} <${normalizedEmail}>`;
+		}
+
+		function getCommitAuthorKey(commit) {
+			return getAuthorKey(commit.author_name, commit.author_email);
+		}
+
+		function getAuthorOptions(data) {
+			const authorMap = new Map();
+
+			for (const commit of data) {
+				const name = String(commit.author_name || '').trim() || 'Unknown author';
+				const email = String(commit.author_email || '').trim();
+				const key = getAuthorKey(name, email);
+				const current = authorMap.get(key) || { key, name, email, commits: 0 };
+				current.commits += 1;
+				authorMap.set(key, current);
+			}
+
+			return Array.from(authorMap.values());
+		}
+
+		function closeAuthorFilterMenu() {
+			authorFilterMenu.classList.add('hidden');
+			authorFilterButton.setAttribute('aria-expanded', 'false');
+		}
+
+		function toggleAuthorFilterMenu() {
+			const isHidden = authorFilterMenu.classList.contains('hidden');
+			authorFilterMenu.classList.toggle('hidden', !isHidden);
+			authorFilterButton.setAttribute('aria-expanded', String(isHidden));
+		}
+
+		function updateAuthorFilterLabel(authorOptions) {
+			if (!authorOptions.length) {
+				authorFilterLabel.textContent = 'All authors';
+				authorFilterCount.textContent = 'No authors loaded';
+				return;
+			}
+
+			authorFilterCount.textContent = `${authorOptions.length} author${authorOptions.length === 1 ? '' : 's'} available`;
+
+			if (!selectedAuthors.size) {
+				authorFilterLabel.textContent = 'All authors';
+				return;
+			}
+
+			if (selectedAuthors.size === 1) {
+				const selectedAuthor = authorOptions.find((author) => selectedAuthors.has(author.key));
+				authorFilterLabel.textContent = selectedAuthor ? selectedAuthor.name : '1 author selected';
+				return;
+			}
+
+			authorFilterLabel.textContent = `${selectedAuthors.size} authors selected`;
+		}
+
+		function renderAuthorFilterOptions(authorOptions) {
+			updateAuthorFilterLabel(authorOptions);
+
+			if (!authorOptions.length) {
+				authorFilterOptions.innerHTML = '<div class="rounded-lg px-3 py-2 text-sm text-slate-500">Parse a dump to load authors.</div>';
+				return;
+			}
+
+			authorFilterOptions.innerHTML = authorOptions.map((author) => {
+				const checked = selectedAuthors.has(author.key) ? 'checked' : '';
+				const email = author.email ? `<div class="text-xs text-slate-500">${escapeHtmlUtil(author.email)}</div>` : '';
+				return `
+					<label class="flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2 text-sm text-slate-900 transition hover:bg-slate-50">
+						<input type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-slate-800 focus:ring-slate-400" data-author-key="${escapeHtmlUtil(author.key)}" ${checked}>
+						<span class="min-w-0 flex-1">
+							<span class="block truncate font-medium">${escapeHtmlUtil(author.name)}</span>
+							${email}
+							<span class="mt-1 block text-xs text-slate-500">${author.commits} commit${author.commits === 1 ? '' : 's'}</span>
+						</span>
+					</label>
+				`;
+			}).join('');
+		}
 
 		function setTableHeight(hasRows) {
 			tableWrap.style.height = hasRows ? '65vh' : 'auto';
@@ -256,7 +372,7 @@
 			for (const commit of data) {
 				const authorName = String(commit.author_name || '').trim() || 'Unknown author';
 				const authorEmail = String(commit.author_email || '').trim();
-				const authorKey = `${authorName} <${authorEmail}>`;
+				const authorKey = getAuthorKey(authorName, authorEmail);
 				const files = Array.isArray(commit.files) ? commit.files : [];
 				const insertions = files.reduce((sum, file) => sum + (file.insertions || 0), 0);
 				const deletions = files.reduce((sum, file) => sum + (file.deletions || 0), 0);
@@ -280,8 +396,7 @@
 				.map((author) => ({
 					...author,
 					changes: author.insertions + author.deletions,
-				}))
-				.sort((left, right) => right.changes - left.changes || right.commits - left.commits || left.name.localeCompare(right.name));
+				}));
 
 			const totalCommits = authors.reduce((sum, author) => sum + author.commits, 0);
 			const totalChanges = authors.reduce((sum, author) => sum + author.changes, 0);
@@ -337,7 +452,7 @@
 			return parents.length === 0;
 		}
 
-		function getVisibleCommits(data) {
+		function getBaseVisibleCommits(data) {
 			return data.filter((commit) => {
 				if (ignoreMergeCommits.checked && isMergeCommit(commit)) {
 					return false;
@@ -349,6 +464,31 @@
 
 				return true;
 			});
+		}
+
+		function getVisibleCommits(data) {
+			return getBaseVisibleCommits(data).filter((commit) => {
+				if (selectedAuthors.size && !selectedAuthors.has(getCommitAuthorKey(commit))) {
+					return false;
+				}
+
+				return true;
+			});
+		}
+
+		function refreshVisibleData() {
+			const visibleCommits = getVisibleCommits(commits);
+			renderRows(visibleCommits);
+			renderContributionGraph(visibleCommits);
+			renderAuthorSummary(visibleCommits);
+		}
+
+		function syncAuthorFilter() {
+			const authorOptions = getAuthorOptions(getBaseVisibleCommits(commits));
+			selectedAuthors = new Set(
+				Array.from(selectedAuthors).filter((authorKey) => authorOptions.some((author) => author.key === authorKey)),
+			);
+			renderAuthorFilterOptions(authorOptions);
 		}
 
 		function toDayKey(dateText) {
@@ -539,9 +679,9 @@
 
 			if (!text) {
 				commits = [];
-				renderRows([]);
-				renderContributionGraph([]);
-				renderAuthorSummary([]);
+				selectedAuthors = new Set();
+				syncAuthorFilter();
+				refreshVisibleData();
 				return;
 			}
 
@@ -551,10 +691,8 @@
 
 			const parsed = parseGitDumpUtil(text);
 			commits = Array.isArray(parsed.commits) ? parsed.commits : [];
-			const visibleCommits = getVisibleCommits(commits);
-			renderRows(visibleCommits);
-			renderContributionGraph(visibleCommits);
-			renderAuthorSummary(visibleCommits);
+			syncAuthorFilter();
+			refreshVisibleData();
 		}
 
 		dumpFile.addEventListener('change', async () => {
@@ -567,15 +705,47 @@
 		});
 
 		parseButton.addEventListener('click', parseCurrentInput);
+		authorFilterButton.addEventListener('click', toggleAuthorFilterMenu);
+		authorFilterClear.addEventListener('click', () => {
+			selectedAuthors = new Set();
+			syncAuthorFilter();
+			refreshVisibleData();
+		});
+		authorFilterOptions.addEventListener('change', (event) => {
+			const input = event.target;
+			if (!(input instanceof HTMLInputElement) || input.type !== 'checkbox') {
+				return;
+			}
+
+			const authorKey = input.dataset.authorKey || '';
+			if (!authorKey) {
+				return;
+			}
+
+			if (input.checked) {
+				selectedAuthors.add(authorKey);
+			} else {
+				selectedAuthors.delete(authorKey);
+			}
+
+			syncAuthorFilter();
+			refreshVisibleData();
+		});
+		document.addEventListener('click', (event) => {
+			if (!authorFilter.contains(event.target)) {
+				closeAuthorFilterMenu();
+			}
+		});
 		clearButton.addEventListener('click', () => {
 			dumpFile.value = '';
 			dumpInput.value = '';
 			commits = [];
-			renderRows([]);
-			renderContributionGraph([]);
-			renderAuthorSummary([]);
+			selectedAuthors = new Set();
+			syncAuthorFilter();
+			refreshVisibleData();
 		});
 
+		syncAuthorFilter();
 		renderRows([]);
 		renderContributionGraph([]);
 		renderAuthorSummary([]);
