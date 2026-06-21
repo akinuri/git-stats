@@ -66,8 +66,8 @@
 					<h2 class="text-lg text-slate-900">Filters</h2>
 					<p class="mt-1 text-sm text-slate-600">Refine the parsed results without changing the raw dump text.</p>
 				</div>
-				<div class="grid w-full gap-6 lg:max-w-6xl lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)_minmax(24rem,max-content)]">
-					<div>
+				<div class="flex w-full flex-wrap items-start gap-6 lg:ml-auto lg:w-auto lg:justify-end">
+					<div class="w-full lg:w-96">
 						<label class="block text-sm text-slate-700" for="authorFilterButton">Author</label>
 						<div id="authorFilter" class="relative mt-1">
 							<button id="authorFilterButton" type="button" aria-haspopup="listbox" aria-expanded="false" class="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus:border-slate-500 focus:outline-none">
@@ -85,12 +85,34 @@
 					</div>
 					<div>
 						<div class="text-sm text-slate-700">Date range</div>
-						<div class="mt-1 flex flex-wrap items-center gap-3">
-							<label class="inline-flex items-center gap-2" for="dateFrom">
+						<div class="mt-1 flex flex-wrap items-center justify-start gap-3">
+							<label class="inline-flex items-center gap-2 whitespace-nowrap" for="dateRangePreset">
+								<span class="shrink-0 text-xs font-medium uppercase tracking-wide text-slate-500">Range:</span>
+								<select id="dateRangePreset" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none">
+									<option value="all">All</option>
+									<option value="custom">Custom</option>
+									<option value="today">Today</option>
+									<option value="yesterday">Yesterday</option>
+									<option value="this_week">This week</option>
+									<option value="last_week">Last week</option>
+									<option value="this_month">This month</option>
+									<option value="last_month">Last month</option>
+									<option value="this_year">This year</option>
+									<option value="last_year">Last year</option>
+									<option value="last_7_days">Last 7 days</option>
+									<option value="last_14_days">Last 14 days</option>
+									<option value="last_30_days">Last 30 days</option>
+									<option value="last_60_days">Last 60 days</option>
+									<option value="last_90_days">Last 90 days</option>
+									<option value="last_180_days">Last 180 days</option>
+									<option value="last_365_days">Last 365 days</option>
+								</select>
+							</label>
+							<label class="inline-flex items-center gap-2 whitespace-nowrap" for="dateFrom">
 								<span class="shrink-0 text-xs font-medium uppercase tracking-wide text-slate-500">From</span>
 								<input id="dateFrom" type="date" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none">
 							</label>
-							<label class="inline-flex items-center gap-2" for="dateTo">
+							<label class="inline-flex items-center gap-2 whitespace-nowrap" for="dateTo">
 								<span class="shrink-0 text-xs font-medium uppercase tracking-wide text-slate-500">To</span>
 								<input id="dateTo" type="date" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none">
 							</label>
@@ -98,7 +120,7 @@
 					</div>
 					<div>
 						<div class="text-sm text-slate-700">Commit filters</div>
-						<div class="mt-1 flex flex-nowrap gap-2">
+						<div class="mt-1 flex flex-wrap gap-2">
 							<label class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700" for="ignoreMergeCommits">
 								<input id="ignoreMergeCommits" type="checkbox" checked class="h-4 w-4 rounded border-slate-400 text-slate-800 focus:ring-slate-400">
 								<span>Ignore merge commits</span>
@@ -200,6 +222,7 @@
 		const authorFilterCount = document.getElementById('authorFilterCount');
 		const authorFilterOptions = document.getElementById('authorFilterOptions');
 		const authorFilterClear = document.getElementById('authorFilterClear');
+		const dateRangePreset = document.getElementById('dateRangePreset');
 		const dateFrom = document.getElementById('dateFrom');
 		const dateTo = document.getElementById('dateTo');
 		const authorSummary = document.getElementById('authorSummary');
@@ -224,6 +247,113 @@
 
 		function getCommitAuthorKey(commit) {
 			return getAuthorKey(commit.author_name, commit.author_email);
+		}
+
+		function formatLocalDate(date) {
+			const year = date.getFullYear();
+			const month = String(date.getMonth() + 1).padStart(2, '0');
+			const day = String(date.getDate()).padStart(2, '0');
+			return `${year}-${month}-${day}`;
+		}
+
+		function addDays(date, days) {
+			const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+			copy.setDate(copy.getDate() + days);
+			return copy;
+		}
+
+		function startOfWeekLocal(date) {
+			const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+			const day = copy.getDay();
+			const mondayOffset = (day + 6) % 7;
+			copy.setDate(copy.getDate() - mondayOffset);
+			return copy;
+		}
+
+		function endOfWeekLocal(date) {
+			return addDays(startOfWeekLocal(date), 6);
+		}
+
+		function applyDatePreset(preset) {
+			const today = new Date();
+			const current = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+			let from = '';
+			let to = '';
+
+			switch (preset) {
+				case 'all':
+					break;
+				case 'custom':
+					return;
+				case 'today':
+					from = formatLocalDate(current);
+					to = formatLocalDate(current);
+					break;
+				case 'yesterday': {
+					const day = addDays(current, -1);
+					from = formatLocalDate(day);
+					to = formatLocalDate(day);
+					break;
+				}
+				case 'this_week':
+					from = formatLocalDate(startOfWeekLocal(current));
+					to = formatLocalDate(current);
+					break;
+				case 'last_week': {
+					const lastWeekStart = addDays(startOfWeekLocal(current), -7);
+					from = formatLocalDate(lastWeekStart);
+					to = formatLocalDate(endOfWeekLocal(lastWeekStart));
+					break;
+				}
+				case 'this_month':
+					from = formatLocalDate(new Date(current.getFullYear(), current.getMonth(), 1));
+					to = formatLocalDate(current);
+					break;
+				case 'last_month': {
+					const lastMonthStart = new Date(current.getFullYear(), current.getMonth() - 1, 1);
+					const lastMonthEnd = new Date(current.getFullYear(), current.getMonth(), 0);
+					from = formatLocalDate(lastMonthStart);
+					to = formatLocalDate(lastMonthEnd);
+					break;
+				}
+				case 'this_year':
+					from = formatLocalDate(new Date(current.getFullYear(), 0, 1));
+					to = formatLocalDate(current);
+					break;
+				case 'last_year':
+					from = formatLocalDate(new Date(current.getFullYear() - 1, 0, 1));
+					to = formatLocalDate(new Date(current.getFullYear() - 1, 11, 31));
+					break;
+				default: {
+					const lastDaysMatch = preset.match(/^last_(\d+)_days$/);
+					if (!lastDaysMatch) {
+						return;
+					}
+
+					const days = Number(lastDaysMatch[1]);
+					if (!Number.isFinite(days) || days <= 0) {
+						return;
+					}
+
+					from = formatLocalDate(addDays(current, -(days - 1)));
+					to = formatLocalDate(current);
+					break;
+				}
+			}
+
+			dateFrom.value = from;
+			dateTo.value = to;
+		}
+
+		function syncDatePresetToInputs() {
+			if (!dateFrom.value && !dateTo.value) {
+				dateRangePreset.value = 'all';
+				return;
+			}
+
+			if (dateRangePreset.value !== 'custom') {
+				dateRangePreset.value = 'custom';
+			}
 		}
 
 		function getActiveDateRange() {
@@ -766,10 +896,18 @@
 			refreshVisibleData();
 		});
 		dateFrom.addEventListener('change', () => {
+			syncDatePresetToInputs();
 			syncAuthorFilter();
 			refreshVisibleData();
 		});
 		dateTo.addEventListener('change', () => {
+			syncDatePresetToInputs();
+			syncAuthorFilter();
+			refreshVisibleData();
+		});
+		dateRangePreset.addEventListener('change', () => {
+			applyDatePreset(dateRangePreset.value);
+			syncDatePresetToInputs();
 			syncAuthorFilter();
 			refreshVisibleData();
 		});
@@ -809,6 +947,7 @@
 			dumpInput.value = '';
 			dateFrom.value = '';
 			dateTo.value = '';
+			dateRangePreset.value = 'all';
 			commits = [];
 			selectedAuthors = new Set();
 			syncAuthorFilter();
