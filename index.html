@@ -47,16 +47,6 @@
 						<input id="dumpFile" type="file" accept=".txt,.log,.dump,text/plain" class="block w-full rounded border border-slate-400 bg-white px-3 py-1.5 text-sm">
 					</div>
 
-					<label class="flex items-center gap-2 text-sm text-slate-700" for="ignoreMergeCommits">
-						<input id="ignoreMergeCommits" type="checkbox" checked class="h-4 w-4 rounded border-slate-400 text-slate-800 focus:ring-slate-400">
-						<span>Ignore merge commits</span>
-					</label>
-
-					<label class="flex items-center gap-2 text-sm text-slate-700" for="ignoreFirstCommit">
-						<input id="ignoreFirstCommit" type="checkbox" checked class="h-4 w-4 rounded border-slate-400 text-slate-800 focus:ring-slate-400">
-						<span>Ignore first commit</span>
-					</label>
-
 					<div class="flex flex-wrap gap-2">
 						<button id="parseButton" class="rounded border border-slate-800 bg-slate-800 px-4 py-1.5 text-sm text-white hover:bg-slate-700">Parse dump</button>
 						<button id="clearButton" class="rounded border border-slate-400 bg-white px-4 py-1.5 text-sm hover:bg-slate-200">Clear</button>
@@ -71,24 +61,39 @@
 		</section>
 
 		<section class="mt-12 rounded bg-white p-4 shadow sm:p-5">
-			<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+			<div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
 				<div>
 					<h2 class="text-lg text-slate-900">Filters</h2>
 					<p class="mt-1 text-sm text-slate-600">Refine the parsed results without changing the raw dump text.</p>
 				</div>
-				<div class="w-full max-w-md">
-					<label class="block text-sm text-slate-700" for="authorFilterButton">Author</label>
-					<div id="authorFilter" class="relative mt-1">
-						<button id="authorFilterButton" type="button" aria-haspopup="listbox" aria-expanded="false" class="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus:border-slate-500 focus:outline-none">
-							<span id="authorFilterLabel" class="truncate">All authors</span>
-							<span class="ml-3 text-slate-500">▾</span>
-						</button>
-						<div id="authorFilterMenu" class="absolute left-0 right-0 z-20 mt-2 hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-							<div class="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
-								<div id="authorFilterCount" class="text-xs text-slate-500">No authors loaded</div>
-								<button id="authorFilterClear" type="button" class="text-xs font-medium text-slate-600 hover:text-slate-900">Clear</button>
+				<div class="grid w-full gap-4 lg:max-w-4xl lg:grid-cols-[minmax(0,1fr)_minmax(24rem,max-content)]">
+					<div>
+						<label class="block text-sm text-slate-700" for="authorFilterButton">Author</label>
+						<div id="authorFilter" class="relative mt-1">
+							<button id="authorFilterButton" type="button" aria-haspopup="listbox" aria-expanded="false" class="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus:border-slate-500 focus:outline-none">
+								<span id="authorFilterLabel" class="truncate">All authors</span>
+								<span class="ml-3 text-slate-500">▾</span>
+							</button>
+							<div id="authorFilterMenu" class="absolute left-0 right-0 z-20 mt-2 hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+								<div class="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+									<div id="authorFilterCount" class="text-xs text-slate-500">No authors loaded</div>
+									<button id="authorFilterClear" type="button" class="text-xs font-medium text-slate-600 hover:text-slate-900">Clear</button>
+								</div>
+								<div id="authorFilterOptions" class="max-h-64 space-y-1 overflow-y-auto pr-1"></div>
 							</div>
-							<div id="authorFilterOptions" class="max-h-64 space-y-1 overflow-y-auto pr-1"></div>
+						</div>
+					</div>
+					<div>
+						<div class="text-sm text-slate-700">Commit filters</div>
+						<div class="mt-1 flex flex-nowrap gap-2">
+							<label class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700" for="ignoreMergeCommits">
+								<input id="ignoreMergeCommits" type="checkbox" checked class="h-4 w-4 rounded border-slate-400 text-slate-800 focus:ring-slate-400">
+								<span>Ignore merge commits</span>
+							</label>
+							<label class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700" for="ignoreFirstCommit">
+								<input id="ignoreFirstCommit" type="checkbox" checked class="h-4 w-4 rounded border-slate-400 text-slate-800 focus:ring-slate-400">
+								<span>Ignore first commit</span>
+							</label>
 						</div>
 					</div>
 				</div>
@@ -705,6 +710,14 @@
 		});
 
 		parseButton.addEventListener('click', parseCurrentInput);
+		ignoreMergeCommits.addEventListener('change', () => {
+			syncAuthorFilter();
+			refreshVisibleData();
+		});
+		ignoreFirstCommit.addEventListener('change', () => {
+			syncAuthorFilter();
+			refreshVisibleData();
+		});
 		authorFilterButton.addEventListener('click', toggleAuthorFilterMenu);
 		authorFilterClear.addEventListener('click', () => {
 			selectedAuthors = new Set();
