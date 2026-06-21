@@ -66,7 +66,7 @@
 					<h2 class="text-lg text-slate-900">Filters</h2>
 					<p class="mt-1 text-sm text-slate-600">Refine the parsed results without changing the raw dump text.</p>
 				</div>
-				<div class="grid w-full gap-4 lg:max-w-4xl lg:grid-cols-[minmax(0,1fr)_minmax(24rem,max-content)]">
+				<div class="grid w-full gap-6 lg:max-w-6xl lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)_minmax(24rem,max-content)]">
 					<div>
 						<label class="block text-sm text-slate-700" for="authorFilterButton">Author</label>
 						<div id="authorFilter" class="relative mt-1">
@@ -81,6 +81,19 @@
 								</div>
 								<div id="authorFilterOptions" class="max-h-64 space-y-1 overflow-y-auto pr-1"></div>
 							</div>
+						</div>
+					</div>
+					<div>
+						<div class="text-sm text-slate-700">Date range</div>
+						<div class="mt-1 flex flex-wrap items-center gap-3">
+							<label class="inline-flex items-center gap-2" for="dateFrom">
+								<span class="shrink-0 text-xs font-medium uppercase tracking-wide text-slate-500">From</span>
+								<input id="dateFrom" type="date" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none">
+							</label>
+							<label class="inline-flex items-center gap-2" for="dateTo">
+								<span class="shrink-0 text-xs font-medium uppercase tracking-wide text-slate-500">To</span>
+								<input id="dateTo" type="date" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none">
+							</label>
 						</div>
 					</div>
 					<div>
@@ -187,6 +200,8 @@
 		const authorFilterCount = document.getElementById('authorFilterCount');
 		const authorFilterOptions = document.getElementById('authorFilterOptions');
 		const authorFilterClear = document.getElementById('authorFilterClear');
+		const dateFrom = document.getElementById('dateFrom');
+		const dateTo = document.getElementById('dateTo');
 		const authorSummary = document.getElementById('authorSummary');
 		const authorSummaryEmpty = document.getElementById('authorSummaryEmpty');
 		const authorSummaryWrap = document.getElementById('authorSummaryWrap');
@@ -209,6 +224,21 @@
 
 		function getCommitAuthorKey(commit) {
 			return getAuthorKey(commit.author_name, commit.author_email);
+		}
+
+		function getActiveDateRange() {
+			const from = String(dateFrom.value || '').trim();
+			const to = String(dateTo.value || '').trim();
+
+			if (from && to && from > to) {
+				return { from: to, to: from };
+			}
+
+			return { from, to };
+		}
+
+		function getCommitDayKey(commit) {
+			return toDayKey(commit.author_date || commit.committer_date);
 		}
 
 		function getAuthorOptions(data) {
@@ -458,6 +488,8 @@
 		}
 
 		function getBaseVisibleCommits(data) {
+			const { from, to } = getActiveDateRange();
+
 			return data.filter((commit) => {
 				if (ignoreMergeCommits.checked && isMergeCommit(commit)) {
 					return false;
@@ -465,6 +497,21 @@
 
 				if (ignoreFirstCommit.checked && isFirstCommit(commit)) {
 					return false;
+				}
+
+				if (from || to) {
+					const dayKey = getCommitDayKey(commit);
+					if (!dayKey) {
+						return false;
+					}
+
+					if (from && dayKey < from) {
+						return false;
+					}
+
+					if (to && dayKey > to) {
+						return false;
+					}
 				}
 
 				return true;
@@ -718,6 +765,14 @@
 			syncAuthorFilter();
 			refreshVisibleData();
 		});
+		dateFrom.addEventListener('change', () => {
+			syncAuthorFilter();
+			refreshVisibleData();
+		});
+		dateTo.addEventListener('change', () => {
+			syncAuthorFilter();
+			refreshVisibleData();
+		});
 		authorFilterButton.addEventListener('click', toggleAuthorFilterMenu);
 		authorFilterClear.addEventListener('click', () => {
 			selectedAuthors = new Set();
@@ -752,6 +807,8 @@
 		clearButton.addEventListener('click', () => {
 			dumpFile.value = '';
 			dumpInput.value = '';
+			dateFrom.value = '';
+			dateTo.value = '';
 			commits = [];
 			selectedAuthors = new Set();
 			syncAuthorFilter();
