@@ -60,7 +60,7 @@
 			</div>
 		</section>
 
-		<section class="mt-12 rounded bg-white p-4 shadow sm:p-5">
+		<section id="filtersCard" class="sticky top-4 z-30 mt-12 rounded bg-white p-4 shadow transition-shadow sm:p-5">
 			<div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
 				<div>
 					<h2 class="text-lg text-slate-900">Filters</h2>
@@ -1111,6 +1111,16 @@
 			syncAuthorFilter();
 			refreshVisibleData();
 		});
+
+		const filtersCard = document.getElementById('filtersCard');
+		function updateFiltersCardShadow() {
+			const isStuck = filtersCard.getBoundingClientRect().top <= 16;
+			filtersCard.classList.toggle('shadow-[0_4px_24px_rgba(15,23,42,0.28)]', isStuck);
+			filtersCard.classList.toggle('shadow', !isStuck);
+		}
+		window.addEventListener('scroll', updateFiltersCardShadow, { passive: true });
+		window.addEventListener('resize', updateFiltersCardShadow);
+		updateFiltersCardShadow();
 
 		syncAuthorFilter();
 		renderRows([]);
