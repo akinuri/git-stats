@@ -268,6 +268,73 @@
 		let commits = [];
 		let selectedAuthors = new Set();
 
+		// Hand-picked, well-separated colors; order alternates hues so consecutive assignments differ strongly
+		const colorPalette = [
+			'#dc2626', '#2563eb', '#16a34a', '#d97706', '#9333ea', '#0891b2',
+			'#db2777', '#65a30d', '#4338ca', '#ea580c', '#0d9488', '#78716c',
+		];
+		const personColors = new Map();
+		let openColorPickerKey = null;
+		let lastAuthorSummaryData = [];
+
+		function nextFreeColor() {
+			const taken = new Set(personColors.values());
+			const free = colorPalette.find((color) => !taken.has(color));
+			if (free) {
+				return free;
+			}
+
+			// Palette exhausted: fall back to generated hues
+			let index = taken.size;
+			let color;
+			do {
+				color = `hsl(${Math.round((index * 137.508) % 360)} 70% ${40 + (index % 4) * 5}%)`;
+				index += 1;
+			} while (taken.has(color));
+			return color;
+		}
+
+		function getPersonColor(key) {
+			if (!personColors.has(key)) {
+				personColors.set(key, nextFreeColor());
+			}
+
+			return personColors.get(key);
+		}
+
+		function ensurePersonColors(data) {
+			const people = new Map();
+			for (const commit of data) {
+				for (const [name, email] of [
+					[commit.author_name, commit.author_email],
+					[commit.committer_name, commit.committer_email],
+				]) {
+					const key = getAuthorKey(name, email);
+					if (!people.has(key)) {
+						people.set(key, String(name || '').trim());
+					}
+				}
+			}
+
+			Array.from(people.entries())
+				.sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]))
+				.forEach(([key]) => getPersonColor(key));
+		}
+
+		function setPersonColor(key, color) {
+			for (const [otherKey, otherColor] of personColors) {
+				if (otherKey !== key && otherColor === color) {
+					// The picked color was taken: the previous owner gets a new one
+					personColors.delete(otherKey);
+					personColors.set(key, color);
+					personColors.set(otherKey, nextFreeColor());
+					return;
+				}
+			}
+
+			personColors.set(key, color);
+		}
+
 		function getAuthorKey(authorName, authorEmail) {
 			const normalizedName = String(authorName || '').trim() || 'Unknown author';
 			const normalizedEmail = String(authorEmail || '').trim();
@@ -460,8 +527,9 @@
 			authorFilterOptions.innerHTML = authorOptions.map((author) => {
 				const checked = selectedAuthors.has(author.key) ? 'checked' : '';
 				const email = author.email ? `<div class="text-xs text-slate-500">${escapeHtmlUtil(author.email)}</div>` : '';
+				const color = getPersonColor(author.key);
 				return `
-					<label class="flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2 text-sm text-slate-900 transition hover:bg-slate-50">
+					<label class="flex cursor-pointer items-start gap-3 rounded-lg border-l-4 px-3 py-2 text-sm text-slate-900 transition hover:brightness-95" style="border-left-color:${color};background-color:color-mix(in srgb, ${color} 6%, white)">
 						<input type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-slate-800 focus:ring-slate-400" data-author-key="${escapeHtmlUtil(author.key)}" ${checked}>
 						<span class="min-w-0 flex-1">
 							<span class="block truncate font-medium">${escapeHtmlUtil(author.name)}</span>
@@ -553,6 +621,7 @@
 		}
 
 		function renderAuthorSummary(data) {
+			lastAuthorSummaryData = data;
 			if (!data.length) {
 				authorSummary.textContent = '';
 				authorSummaryBody.innerHTML = '';
@@ -571,6 +640,7 @@
 				const insertions = files.reduce((sum, file) => sum + (file.insertions || 0), 0);
 				const deletions = files.reduce((sum, file) => sum + (file.deletions || 0), 0);
 				const current = authorMap.get(authorKey) || {
+					key: authorKey,
 					name: authorName,
 					email: authorEmail,
 					commits: 0,
@@ -599,13 +669,28 @@
 
 			authorSummaryBody.innerHTML = authors.map((author) => {
 				const authorLabel = escapeHtmlUtil(author.name);
-				const authorEmail = author.email ? `<div class="text-slate-500">${escapeHtmlUtil(author.email)}</div>` : '';
+				const color = getPersonColor(author.key);
+				const escapedKey = escapeHtmlUtil(author.key);
+				const takenBy = new Map(Array.from(personColors, ([key, value]) => [value, key]));
+				const picker = openColorPickerKey === author.key ? `
+					<div class="absolute left-0 top-full z-20 mt-1 grid grid-cols-6 gap-1.5 rounded-lg border border-slate-200 bg-white p-2 shadow-xl" data-color-picker>
+						${colorPalette.map((paletteColor) => {
+							const isCurrent = paletteColor === color;
+							const isTaken = takenBy.has(paletteColor) && !isCurrent;
+							return `<button type="button" data-pick-color="${paletteColor}" data-author-key="${escapedKey}" title="${isTaken ? 'In use - its owner will get a new color' : paletteColor}" class="h-5 w-5 rounded-full border-2 ${isCurrent ? 'border-slate-900' : 'border-white'} ${isTaken ? 'opacity-50' : ''}" style="background:${paletteColor}"></button>`;
+						}).join('')}
+					</div>
+				` : '';
 				return `
-					<div class="flex-none rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
+					<div class="flex-none rounded-xl border border-slate-200 border-l-4 bg-slate-50 p-3 shadow-sm" style="border-left-color:${color};background-color:color-mix(in srgb, ${color} 5%, white);border-color:color-mix(in srgb, ${color} 18%, #e2e8f0);border-left-color:${color}">
 						<div class="flex items-start justify-between gap-2">
-							<div>
-								<div class="font-semibold text-slate-900">${authorLabel}</div>
-								<div class="text-slate-500">${author.email ? escapeHtmlUtil(author.email) : ''}</div>
+							<div class="relative flex items-start gap-2">
+								<button type="button" data-color-toggle data-author-key="${escapedKey}" title="Change color" class="mt-1 h-4 w-4 shrink-0 rounded-full border border-white shadow ring-1 ring-slate-300" style="background:${color}"></button>
+								<div>
+									<div class="font-semibold text-slate-900">${authorLabel}</div>
+									<div class="text-slate-500">${author.email ? escapeHtmlUtil(author.email) : ''}</div>
+								</div>
+								${picker}
 							</div>
 							<div class="rounded-full bg-slate-200 px-2 py-0.5 font-semibold text-black/75">${author.commits} commit${author.commits === 1 ? '' : 's'}</div>
 						</div>
@@ -704,11 +789,6 @@
 			return { dayKey: match[1], minutes: Number(match[2]) * 60 + Number(match[3]) };
 		}
 
-		function personColor(index) {
-			// Golden-angle hue spacing keeps neighbouring people visually distinct
-			return `hsl(${Math.round((index * 137.508) % 360)} 70% 45%)`;
-		}
-
 		const timelineGroup = document.getElementById('timelineGroup');
 		let timelineData = [];
 		timelineGroup.addEventListener('change', () => renderTimeline(timelineData));
@@ -757,11 +837,9 @@
 				return;
 			}
 
-			Array.from(people.values())
-				.sort((a, b) => a.name.localeCompare(b.name) || a.email.localeCompare(b.email))
-				.forEach((person, index) => {
-					person.color = personColor(index);
-				});
+			Array.from(people.values()).forEach((person) => {
+				person.color = getPersonColor(person.key);
+			});
 
 			const sortedDays = Array.from(days).sort();
 			const firstDay = parseDayKey(sortedDays[0]);
@@ -1030,6 +1108,7 @@
 
 			if (!text) {
 				commits = [];
+				personColors.clear();
 				selectedAuthors = new Set();
 				syncAuthorFilter();
 				refreshVisibleData();
@@ -1042,6 +1121,8 @@
 
 			const parsed = parseGitDumpUtil(text);
 			commits = Array.isArray(parsed.commits) ? parsed.commits : [];
+			personColors.clear();
+			ensurePersonColors(commits);
 			syncAuthorFilter();
 			refreshVisibleData();
 		}
@@ -1056,6 +1137,32 @@
 		});
 
 		parseButton.addEventListener('click', parseCurrentInput);
+		authorSummaryBody.addEventListener('click', (event) => {
+			const toggle = event.target.closest('[data-color-toggle]');
+			const pick = event.target.closest('[data-pick-color]');
+			if (!toggle && !pick) {
+				return;
+			}
+
+			event.stopPropagation();
+			if (toggle) {
+				const key = toggle.dataset.authorKey;
+				openColorPickerKey = openColorPickerKey === key ? null : key;
+			} else {
+				setPersonColor(pick.dataset.authorKey, pick.dataset.pickColor);
+				openColorPickerKey = null;
+				syncAuthorFilter();
+				renderTimeline(timelineData);
+			}
+
+			renderAuthorSummary(lastAuthorSummaryData);
+		});
+		document.addEventListener('click', () => {
+			if (openColorPickerKey !== null) {
+				openColorPickerKey = null;
+				renderAuthorSummary(lastAuthorSummaryData);
+			}
+		});
 		ignoreMergeCommits.addEventListener('change', () => {
 			syncAuthorFilter();
 			refreshVisibleData();
@@ -1118,6 +1225,7 @@
 			dateTo.value = '';
 			dateRangePreset.value = 'all';
 			commits = [];
+			personColors.clear();
 			selectedAuthors = new Set();
 			syncAuthorFilter();
 			refreshVisibleData();
