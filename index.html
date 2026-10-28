@@ -166,6 +166,23 @@
 
 		<section class="mt-12 rounded bg-white p-4 shadow sm:p-5">
 			<div class="flex items-center justify-between gap-3">
+				<h2 class="text-lg text-slate-900">Timeline</h2>
+				<div id="timelineSummary" class="text-sm text-slate-600"></div>
+			</div>
+			<div id="timelineEmpty" class="mt-4 text-slate-700">Parse a dump to see the timeline.</div>
+			<div id="timelineWrap" class="mt-4 hidden">
+				<div id="timelineLegend" class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-700"></div>
+				<div class="flex">
+					<div id="timelineHours" class="relative shrink-0 border-r border-slate-200 bg-white"></div>
+					<div class="min-w-0 flex-1 overflow-x-auto">
+						<div id="timelineCanvas" class="relative"></div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section class="mt-12 rounded bg-white p-4 shadow sm:p-5">
+			<div class="flex items-center justify-between gap-3">
 				<h2 class="text-lg text-slate-900">Author Activity</h2>
 				<div id="authorSummary" class="text-sm text-slate-600"></div>
 			</div>
@@ -215,6 +232,12 @@
 		const contributionGraphWrap = document.getElementById('contributionGraphWrap');
 		const contributionMonths = document.getElementById('contributionMonths');
 		const contributionGrid = document.getElementById('contributionGrid');
+		const timelineSummary = document.getElementById('timelineSummary');
+		const timelineEmpty = document.getElementById('timelineEmpty');
+		const timelineWrap = document.getElementById('timelineWrap');
+		const timelineLegend = document.getElementById('timelineLegend');
+		const timelineHours = document.getElementById('timelineHours');
+		const timelineCanvas = document.getElementById('timelineCanvas');
 		const authorFilter = document.getElementById('authorFilter');
 		const authorFilterButton = document.getElementById('authorFilterButton');
 		const authorFilterLabel = document.getElementById('authorFilterLabel');
@@ -662,7 +685,142 @@
 			const visibleCommits = getVisibleCommits(commits);
 			renderRows(visibleCommits);
 			renderContributionGraph(visibleCommits);
+			renderTimeline(visibleCommits);
 			renderAuthorSummary(visibleCommits);
+		}
+
+		function parseDateParts(dateText) {
+			const match = String(dateText || '').match(/(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})/);
+			if (!match) {
+				return null;
+			}
+
+			return { dayKey: match[1], minutes: Number(match[2]) * 60 + Number(match[3]) };
+		}
+
+		function personColor(index) {
+			// Golden-angle hue spacing keeps neighbouring people visually distinct
+			return `hsl(${Math.round((index * 137.508) % 360)} 70% 45%)`;
+		}
+
+		function renderTimeline(data) {
+			const people = new Map();
+			const slots = new Map();
+			const days = new Set();
+
+			const addEvent = (name, email, dateText, role) => {
+				const parts = parseDateParts(dateText);
+				if (!parts) {
+					return;
+				}
+
+				const personName = String(name || '').trim() || 'Unknown';
+				const personEmail = String(email || '').trim();
+				const key = getAuthorKey(personName, personEmail);
+				if (!people.has(key)) {
+					people.set(key, { key, name: personName, email: personEmail, color: '' });
+				}
+
+				days.add(parts.dayKey);
+				const slot = Math.floor(parts.minutes / 15);
+				const slotKey = `${parts.dayKey}|${slot}|${key}|${role}`;
+				const entry = slots.get(slotKey) || { dayKey: parts.dayKey, slot, key, role, count: 0 };
+				entry.count += 1;
+				slots.set(slotKey, entry);
+			};
+
+			for (const commit of data) {
+				addEvent(commit.author_name, commit.author_email, commit.author_date, 'author');
+				if (commit.committer_date && commit.committer_date !== commit.author_date) {
+					addEvent(commit.committer_name, commit.committer_email, commit.committer_date, 'committer');
+				}
+			}
+
+			if (!slots.size) {
+				timelineSummary.textContent = '';
+				timelineCanvas.innerHTML = '';
+				timelineHours.innerHTML = '';
+				timelineLegend.innerHTML = '';
+				timelineWrap.classList.add('hidden');
+				timelineEmpty.classList.remove('hidden');
+				return;
+			}
+
+			Array.from(people.values())
+				.sort((a, b) => a.name.localeCompare(b.name) || a.email.localeCompare(b.email))
+				.forEach((person, index) => {
+					person.color = personColor(index);
+				});
+
+			const sortedDays = Array.from(days).sort();
+			const firstDay = parseDayKey(sortedDays[0]);
+			const lastDay = parseDayKey(sortedDays[sortedDays.length - 1]);
+			const dayList = [];
+			for (let d = new Date(firstDay); d <= lastDay; d.setUTCDate(d.getUTCDate() + 1)) {
+				dayList.push(d.toISOString().slice(0, 10));
+			}
+
+			const dayWidth = 36;
+			const hourHeight = 24;
+			const headerHeight = 24;
+			const totalWidth = dayList.length * dayWidth;
+			const totalHeight = 24 * hourHeight;
+			const dayIndex = new Map(dayList.map((dayKey, index) => [dayKey, index]));
+
+			timelineHours.style.width = '44px';
+			timelineHours.style.height = `${totalHeight + headerHeight}px`;
+			timelineHours.innerHTML = Array.from({ length: 24 }, (_, hour) =>
+				`<div class="absolute right-1 text-[10px] leading-none text-slate-500" style="top:${headerHeight + hour * hourHeight + 2}px">${String(hour).padStart(2, '0')}:00</div>`,
+			).join('');
+
+			let html = `<div style="width:${totalWidth}px;height:${totalHeight + headerHeight}px" class="relative">`;
+			html += `<div class="absolute left-0 right-0 border-b border-slate-200 bg-white" style="top:0;height:${headerHeight}px"></div>`;
+			html += `<div class="absolute left-0 right-0" style="top:${headerHeight}px;height:${totalHeight}px;background:linear-gradient(to bottom,rgba(30,58,138,.10) 0%,rgba(30,58,138,.10) 25%,rgba(250,204,21,.10) 30%,rgba(250,204,21,.10) 75%,rgba(30,58,138,.10) 80%,rgba(30,58,138,.10) 100%)"></div>`;
+
+			for (let hour = 0; hour < 24; hour++) {
+				html += `<div class="absolute left-0 right-0 border-t border-slate-200/70" style="top:${headerHeight + hour * hourHeight}px"></div>`;
+			}
+
+			dayList.forEach((dayKey, index) => {
+				const weekday = parseDayKey(dayKey).getUTCDay();
+				const isWeekend = weekday === 0 || weekday === 6;
+				const isMonthStart = dayKey.endsWith('-01');
+				const left = index * dayWidth;
+				if (isWeekend) {
+					html += `<div class="absolute bg-slate-300/30" style="left:${left}px;top:${headerHeight}px;width:${dayWidth}px;height:${totalHeight}px"></div>`;
+				}
+				html += `<div class="absolute ${isMonthStart ? 'border-l-2 border-slate-400' : 'border-l border-slate-200'}" style="left:${left}px;top:${headerHeight}px;height:${totalHeight}px"></div>`;
+				html += `<div class="absolute whitespace-nowrap px-1 text-[10px] text-slate-600" style="left:${left}px;top:6px" title="${dayKey}">${dayKey.slice(5)}</div>`;
+			});
+
+			const maxCount = Math.max(...Array.from(slots.values(), (entry) => entry.count));
+			for (const entry of slots.values()) {
+				const person = people.get(entry.key);
+				const x = dayIndex.get(entry.dayKey) * dayWidth + dayWidth / 2;
+				const y = headerHeight + (entry.slot * 15 / 60) * hourHeight + hourHeight / 8;
+				const opacity = maxCount > 1 ? 0.45 + 0.55 * (entry.count / maxCount) : 0.85;
+				const hh = String(Math.floor(entry.slot / 4)).padStart(2, '0');
+				const mm = String((entry.slot % 4) * 15).padStart(2, '0');
+				const title = `${person.name}${person.email ? ` <${person.email}>` : ''} (${entry.role}) — ${entry.dayKey} ${hh}:${mm}, ${entry.count} commit${entry.count === 1 ? '' : 's'}`;
+				// Committer events are drawn as rings, author events as filled dots
+				const style = entry.role === 'author'
+					? `background:${person.color}`
+					: `background:white;border:2px solid ${person.color}`;
+				html += `<div class="absolute rounded-full" style="left:${x - 5}px;top:${y - 5}px;width:10px;height:10px;opacity:${opacity};${style}" title="${escapeHtmlUtil(title)}"></div>`;
+			}
+
+			html += '</div>';
+			timelineCanvas.innerHTML = html;
+
+			const legendItems = Array.from(people.values()).map((person) =>
+				`<span class="inline-flex items-center gap-1.5"><span class="inline-block h-2.5 w-2.5 rounded-full" style="background:${person.color}"></span>${escapeHtmlUtil(person.name)}</span>`,
+			);
+			legendItems.push('<span class="text-slate-500">● author date &nbsp; ○ committer date (when different)</span>');
+			timelineLegend.innerHTML = legendItems.join('');
+
+			timelineSummary.textContent = `${dayList.length} day${dayList.length === 1 ? '' : 's'}, ${people.size} ${people.size === 1 ? 'person' : 'people'}`;
+			timelineEmpty.classList.add('hidden');
+			timelineWrap.classList.remove('hidden');
 		}
 
 		function syncAuthorFilter() {
@@ -957,6 +1115,7 @@
 		syncAuthorFilter();
 		renderRows([]);
 		renderContributionGraph([]);
+		renderTimeline([]);
 		renderAuthorSummary([]);
 	</script>
 </body>
