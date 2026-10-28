@@ -167,7 +167,13 @@
 		<section class="mt-12 rounded bg-white p-4 shadow sm:p-5">
 			<div class="flex items-center justify-between gap-3">
 				<h2 class="text-lg text-slate-900">Timeline</h2>
-				<div id="timelineSummary" class="text-sm text-slate-600"></div>
+				<div class="flex items-center gap-4">
+					<label class="inline-flex items-center gap-2 text-sm text-slate-700" for="timelineGroup">
+						<input id="timelineGroup" type="checkbox" checked class="h-4 w-4 rounded border-slate-400 text-slate-800 focus:ring-slate-400">
+						<span>Group into 15-min slots</span>
+					</label>
+					<div id="timelineSummary" class="text-sm text-slate-600"></div>
+				</div>
 			</div>
 			<div id="timelineEmpty" class="mt-4 text-slate-700">Parse a dump to see the timeline.</div>
 			<div id="timelineWrap" class="mt-4 hidden">
@@ -703,7 +709,12 @@
 			return `hsl(${Math.round((index * 137.508) % 360)} 70% 45%)`;
 		}
 
+		const timelineGroup = document.getElementById('timelineGroup');
+		let timelineData = [];
+		timelineGroup.addEventListener('change', () => renderTimeline(timelineData));
 		function renderTimeline(data) {
+			timelineData = data;
+			const slotSize = timelineGroup.checked ? 15 : 1;
 			const people = new Map();
 			const slots = new Map();
 			const days = new Set();
@@ -722,7 +733,7 @@
 				}
 
 				days.add(parts.dayKey);
-				const slot = Math.floor(parts.minutes / 15);
+				const slot = Math.floor(parts.minutes / slotSize);
 				const slotKey = `${parts.dayKey}|${slot}|${key}|${role}`;
 				const entry = slots.get(slotKey) || { dayKey: parts.dayKey, slot, key, role, count: 0 };
 				entry.count += 1;
@@ -797,10 +808,10 @@
 			for (const entry of slots.values()) {
 				const person = people.get(entry.key);
 				const x = dayIndex.get(entry.dayKey) * dayWidth + dayWidth / 2;
-				const y = headerHeight + (entry.slot * 15 / 60) * hourHeight + hourHeight / 8;
+				const y = headerHeight + (entry.slot * slotSize / 60) * hourHeight + hourHeight / 8;
 				const opacity = maxCount > 1 ? 0.45 + 0.55 * (entry.count / maxCount) : 0.85;
-				const hh = String(Math.floor(entry.slot / 4)).padStart(2, '0');
-				const mm = String((entry.slot % 4) * 15).padStart(2, '0');
+				const hh = String(Math.floor(entry.slot * slotSize / 60)).padStart(2, '0');
+				const mm = String((entry.slot * slotSize) % 60).padStart(2, '0');
 				const title = `${person.name}${person.email ? ` <${person.email}>` : ''} (${entry.role}) — ${entry.dayKey} ${hh}:${mm}, ${entry.count} commit${entry.count === 1 ? '' : 's'}`;
 				// Committer events are drawn as rings, author events as filled dots
 				const style = entry.role === 'author'
