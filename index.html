@@ -39,19 +39,9 @@
 			<h1 class="text-3xl">Git Stats</h1>
 		</header>
 
-		<section class="mt-4 rounded bg-white p-4 shadow sm:p-5">
-			<div class="space-y-4">
-				<div class="space-y-1">
-					<label class="block text-sm text-slate-700" for="dumpFile">Upload dump file</label>
-					<input id="dumpFile" type="file" accept=".txt,.log,.dump,text/plain" class="block w-full rounded border border-slate-400 bg-white px-3 py-1.5 text-sm">
-				</div>
-
-				<div class="space-y-1">
-					<label class="block text-sm text-slate-700" for="dumpInput">Paste dump text</label>
-					<textarea id="dumpInput" rows="4" spellcheck="false" placeholder="@@COMMIT@@ ..." class="block w-full rounded border border-slate-400 bg-white px-3 py-1.5 font-mono text-sm"></textarea>
-				</div>
-			</div>
-		</section>
+		<div id="projectCards" class="mt-4 flex flex-wrap items-start gap-4">
+			<button id="addProjectButton" type="button" title="Add project" aria-label="Add project" class="flex h-9 w-9 shrink-0 items-center justify-center self-center rounded-full bg-slate-800 text-white shadow-lg hover:bg-slate-700"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 3v14M3 10h14"/></svg></button>
+		</div>
 
 		<div class="mt-4 flex flex-wrap gap-2">
 			<button id="parseButton" class="rounded border border-slate-800 bg-slate-800 px-4 py-1.5 text-sm text-white hover:bg-slate-700">Parse dump</button>
@@ -65,6 +55,22 @@
 					<p class="mt-1 text-sm text-slate-600">Refine the parsed results.</p>
 				</div>
 				<div class="flex w-full flex-wrap items-start gap-6 lg:ml-auto lg:w-auto lg:justify-end">
+					<div class="w-full lg:w-56">
+						<label class="block text-sm text-slate-700" for="projectFilterButton">Project</label>
+						<div id="projectFilter" class="relative mt-1">
+							<button id="projectFilterButton" type="button" aria-haspopup="listbox" aria-expanded="false" class="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus:border-slate-500 focus:outline-none">
+								<span id="projectFilterLabel" class="truncate">All projects</span>
+								<span class="ml-3 text-slate-500">▾</span>
+							</button>
+							<div id="projectFilterMenu" class="absolute left-0 right-0 z-20 mt-2 hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+								<div class="mb-2 flex items-center justify-between gap-2 border-b border-slate-100 pb-2">
+									<div id="projectFilterCount" class="text-xs text-slate-500">No projects loaded</div>
+									<button id="projectFilterClear" type="button" class="text-xs font-medium text-slate-600 hover:text-slate-900">Clear</button>
+								</div>
+								<div id="projectFilterOptions" class="max-h-64 space-y-1 overflow-y-auto pr-1"></div>
+							</div>
+						</div>
+					</div>
 					<div class="w-full lg:w-64">
 						<label class="block text-sm text-slate-700" for="authorFilterButton">Author</label>
 						<div id="authorFilter" class="relative mt-1">
@@ -202,6 +208,7 @@
 					<thead class="sticky top-0 z-10 bg-slate-200 text-slate-800 backdrop-blur-sm">
 						<tr>
 							<th class="px-4 py-3">#</th>
+							<th class="px-4 py-3">Project</th>
 							<th class="px-4 py-3">Hash</th>
 							<th class="px-4 py-3">Parents</th>
 							<th class="px-4 py-3">Author</th>
@@ -222,8 +229,15 @@
 	</main>
 
 	<script>
-		const dumpFile = document.getElementById('dumpFile');
-		const dumpInput = document.getElementById('dumpInput');
+		const projectCards = document.getElementById('projectCards');
+		const addProjectButton = document.getElementById('addProjectButton');
+		const projectFilter = document.getElementById('projectFilter');
+		const projectFilterButton = document.getElementById('projectFilterButton');
+		const projectFilterLabel = document.getElementById('projectFilterLabel');
+		const projectFilterMenu = document.getElementById('projectFilterMenu');
+		const projectFilterCount = document.getElementById('projectFilterCount');
+		const projectFilterOptions = document.getElementById('projectFilterOptions');
+		const projectFilterClear = document.getElementById('projectFilterClear');
 		const ignoreMergeCommits = document.getElementById('ignoreMergeCommits');
 		const ignoreFirstCommit = document.getElementById('ignoreFirstCommit');
 		const parseButton = document.getElementById('parseButton');
@@ -265,6 +279,109 @@
 
 		let commits = [];
 		let selectedAuthors = new Set();
+		let selectedProjects = new Set();
+		let projectCounter = 0;
+
+		function getCardElements() {
+			return Array.from(projectCards.querySelectorAll('[data-project-card]'));
+		}
+
+		function getProjectName(projectId) {
+			const card = projectCards.querySelector(`[data-project-card="${projectId}"]`);
+			const input = card && card.querySelector('[data-project-name]');
+			return (input && input.value.trim()) || `Project ${projectId}`;
+		}
+
+		function updateRemoveButtons() {
+			const cards = getCardElements();
+			for (const card of cards) {
+				card.querySelector('[data-project-remove]').classList.toggle('hidden', cards.length < 2);
+			}
+		}
+
+		function addProjectCard() {
+			projectCounter += 1;
+			const id = projectCounter;
+			const card = document.createElement('section');
+			card.dataset.projectCard = String(id);
+			card.className = 'w-full rounded bg-white p-4 shadow sm:w-96';
+			card.innerHTML = `
+				<div class="flex items-center gap-2">
+					<input data-project-name type="text" value="Project ${id}" aria-label="Project name" class="min-w-0 flex-1 rounded border border-transparent px-2 py-1 text-lg text-slate-900 hover:border-slate-300 focus:border-slate-500 focus:outline-none">
+					<button data-project-remove type="button" title="Remove project" aria-label="Remove project" class="hidden h-8 w-8 shrink-0 rounded text-slate-500 hover:bg-slate-200 hover:text-slate-900">✕</button>
+				</div>
+				<div class="mt-3 space-y-3">
+					<div class="space-y-1">
+						<label class="block text-sm text-slate-700">Upload dump file</label>
+						<input data-dump-file type="file" accept=".txt,.log,.dump,text/plain" class="block w-full rounded border border-slate-400 bg-white px-3 py-1.5 text-sm">
+					</div>
+					<div class="space-y-1">
+						<label class="block text-sm text-slate-700">Paste dump text</label>
+						<textarea data-dump-input rows="4" spellcheck="false" placeholder="@@COMMIT@@ ..." class="block w-full rounded border border-slate-400 bg-white px-3 py-1.5 font-mono text-sm"></textarea>
+					</div>
+				</div>
+			`;
+			projectCards.insertBefore(card, addProjectButton);
+			updateRemoveButtons();
+			return card;
+		}
+
+		function removeProjectCard(card) {
+			const projectId = Number(card.dataset.projectCard);
+			card.remove();
+			updateRemoveButtons();
+			commits = commits.filter((commit) => commit.projectId !== projectId);
+			selectedProjects.delete(projectId);
+			refreshAll();
+		}
+
+		function getProjectOptions() {
+			return getCardElements().map((card) => {
+				const id = Number(card.dataset.projectCard);
+				return { id, name: getProjectName(id), commits: commits.filter((commit) => commit.projectId === id).length };
+			});
+		}
+
+		function closeProjectFilterMenu() {
+			projectFilterMenu.classList.add('hidden');
+			projectFilterButton.setAttribute('aria-expanded', 'false');
+		}
+
+		function syncProjectFilter() {
+			const options = getProjectOptions();
+			const loaded = options.filter((option) => option.commits > 0);
+			selectedProjects = new Set(Array.from(selectedProjects).filter((id) => loaded.some((option) => option.id === id)));
+
+			projectFilterCount.textContent = loaded.length ? `${loaded.length} project${loaded.length === 1 ? '' : 's'} available` : 'No projects loaded';
+			if (!selectedProjects.size) {
+				projectFilterLabel.textContent = 'All projects';
+			} else if (selectedProjects.size === 1) {
+				projectFilterLabel.textContent = getProjectName(Array.from(selectedProjects)[0]);
+			} else {
+				projectFilterLabel.textContent = `${selectedProjects.size} projects selected`;
+			}
+
+			if (!loaded.length) {
+				projectFilterOptions.innerHTML = '<div class="rounded-lg px-3 py-2 text-sm text-slate-500">Parse a dump to load projects.</div>';
+				return;
+			}
+
+			projectFilterOptions.innerHTML = loaded.map((option) => `
+				<label class="flex cursor-pointer items-start gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-900 hover:bg-slate-100">
+					<input type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-slate-800 focus:ring-slate-400" data-project-id="${option.id}" ${selectedProjects.has(option.id) ? 'checked' : ''}>
+					<span class="min-w-0 flex-1">
+						<span class="block truncate font-medium">${escapeHtmlUtil(option.name)}</span>
+						<span class="block text-xs text-slate-500">${option.commits} commit${option.commits === 1 ? '' : 's'}</span>
+					</span>
+				</label>
+			`).join('');
+		}
+
+		function refreshAll() {
+			syncProjectFilter();
+			syncAuthorFilter();
+			refreshVisibleData();
+		}
 
 		// Hand-picked, well-separated colors; order alternates hues so consecutive assignments differ strongly
 		const colorPalette = [
@@ -584,6 +701,7 @@
 				return `
 					<tr class="align-top hover:bg-slate-50">
 						<td class="whitespace-nowrap px-4 py-2 text-slate-900">${rowNumber}</td>
+						<td class="whitespace-nowrap px-4 py-2 text-slate-900">${escapeHtmlUtil(getProjectName(commit.projectId))}</td>
 						<td class="whitespace-nowrap px-4 py-2 font-mono text-base text-slate-900" title="${escapeHtmlUtil(commit.hash || '')}">${escapeHtmlUtil(shortHashUtil(commit.hash))}</td>
 						<td class="whitespace-nowrap px-4 py-2 font-mono text-base text-slate-900" title="${escapeHtmlUtil(commit.parents.join(' '))}">${shortParents ? escapeHtmlUtil(shortParents) : '<span class="text-slate-900">-</span>'}</td>
 						<td class="px-4 py-2 text-slate-900">
@@ -738,6 +856,10 @@
 			const { from, to } = getActiveDateRange();
 
 			return data.filter((commit) => {
+				if (selectedProjects.size && !selectedProjects.has(commit.projectId)) {
+					return false;
+				}
+
 				if (ignoreMergeCommits.checked && isMergeCommit(commit)) {
 					return false;
 				}
@@ -1107,36 +1229,87 @@
 		}
 
 		function parseCurrentInput() {
-			const text = dumpInput.value.trim();
-
-			if (!text) {
-				commits = [];
-				personColors.clear();
-				selectedAuthors = new Set();
-				syncAuthorFilter();
-				refreshVisibleData();
-				return;
-			}
-
 			if (typeof parseGitDumpUtil !== 'function') {
 				return;
 			}
 
-			const parsed = parseGitDumpUtil(text);
-			commits = Array.isArray(parsed.commits) ? parsed.commits : [];
+			const all = [];
+			for (const card of getCardElements()) {
+				const text = card.querySelector('[data-dump-input]').value.trim();
+				if (!text) {
+					continue;
+				}
+
+				const projectId = Number(card.dataset.projectCard);
+				const parsed = parseGitDumpUtil(text);
+				for (const commit of Array.isArray(parsed.commits) ? parsed.commits : []) {
+					commit.projectId = projectId;
+					all.push(commit);
+				}
+			}
+
+			const timeOf = (commit) => Date.parse(commit.author_date || commit.committer_date || '') || 0;
+			commits = getCardElements().length > 1 ? all.sort((a, b) => timeOf(b) - timeOf(a)) : all;
 			personColors.clear();
 			ensurePersonColors(commits);
-			syncAuthorFilter();
-			refreshVisibleData();
+			refreshAll();
 		}
 
-		dumpFile.addEventListener('change', async () => {
-			const file = dumpFile.files && dumpFile.files[0];
-			if (!file) {
+		projectCards.addEventListener('change', async (event) => {
+			const card = event.target.closest('[data-project-card]');
+			if (!card) {
 				return;
 			}
 
-			dumpInput.value = await file.text();
+			if (event.target.matches('[data-dump-file]')) {
+				const file = event.target.files && event.target.files[0];
+				if (file) {
+					card.querySelector('[data-dump-input]').value = await file.text();
+					const name = file.name.replace(/\.[^.]+$/, '').replace(/[-_ ]?git[-_ ]?history$/i, '');
+					if (name) {
+						card.querySelector('[data-project-name]').value = name;
+						refreshAll();
+					}
+				}
+			} else if (event.target.matches('[data-project-name]')) {
+				refreshAll();
+			}
+		});
+		projectCards.addEventListener('click', (event) => {
+			const remove = event.target.closest('[data-project-remove]');
+			if (remove) {
+				removeProjectCard(remove.closest('[data-project-card]'));
+			}
+		});
+		addProjectButton.addEventListener('click', addProjectCard);
+		projectFilterButton.addEventListener('click', () => {
+			const isHidden = projectFilterMenu.classList.contains('hidden');
+			projectFilterMenu.classList.toggle('hidden', !isHidden);
+			projectFilterButton.setAttribute('aria-expanded', String(isHidden));
+		});
+		projectFilterClear.addEventListener('click', () => {
+			selectedProjects = new Set();
+			refreshAll();
+		});
+		projectFilterOptions.addEventListener('change', (event) => {
+			const input = event.target;
+			if (!(input instanceof HTMLInputElement) || input.type !== 'checkbox') {
+				return;
+			}
+
+			const id = Number(input.dataset.projectId);
+			if (input.checked) {
+				selectedProjects.add(id);
+			} else {
+				selectedProjects.delete(id);
+			}
+
+			refreshAll();
+		});
+		document.addEventListener('click', (event) => {
+			if (!projectFilter.contains(event.target)) {
+				closeProjectFilterMenu();
+			}
 		});
 
 		parseButton.addEventListener('click', parseCurrentInput);
@@ -1222,16 +1395,22 @@
 			}
 		});
 		clearButton.addEventListener('click', () => {
-			dumpFile.value = '';
-			dumpInput.value = '';
+			for (const card of getCardElements().slice(1)) {
+				card.remove();
+			}
+			const [firstCard] = getCardElements();
+			firstCard.querySelector('[data-dump-file]').value = '';
+			firstCard.querySelector('[data-dump-input]').value = '';
+			firstCard.querySelector('[data-project-name]').value = `Project ${firstCard.dataset.projectCard}`;
+			updateRemoveButtons();
 			dateFrom.value = '';
 			dateTo.value = '';
 			dateRangePreset.value = 'all';
 			commits = [];
 			personColors.clear();
 			selectedAuthors = new Set();
-			syncAuthorFilter();
-			refreshVisibleData();
+			selectedProjects = new Set();
+			refreshAll();
 		});
 
 		const filtersCard = document.getElementById('filtersCard');
@@ -1244,6 +1423,8 @@
 		window.addEventListener('resize', updateFiltersCardShadow);
 		updateFiltersCardShadow();
 
+		addProjectCard();
+		syncProjectFilter();
 		syncAuthorFilter();
 		renderRows([]);
 		renderContributionGraph([]);
