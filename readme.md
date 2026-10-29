@@ -50,3 +50,7 @@ http-server .
 ```
 
 Then open `http://127.0.0.1:8080`.
+
+## Screenshot
+
+![Git Stats dashboard screenshot](ss.png)
