@@ -65,7 +65,7 @@
 					<p class="mt-1 text-sm text-slate-600">Refine the parsed results.</p>
 				</div>
 				<div class="flex w-full flex-wrap items-start gap-6 lg:ml-auto lg:w-auto lg:justify-end">
-					<div class="w-full lg:w-96">
+					<div class="w-full lg:w-64">
 						<label class="block text-sm text-slate-700" for="authorFilterButton">Author</label>
 						<div id="authorFilter" class="relative mt-1">
 							<button id="authorFilterButton" type="button" aria-haspopup="listbox" aria-expanded="false" class="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus:border-slate-500 focus:outline-none">
@@ -528,7 +528,7 @@
 
 			authorFilterOptions.innerHTML = authorOptions.map((author) => {
 				const checked = selectedAuthors.has(author.key) ? 'checked' : '';
-				const email = author.email ? `<div class="text-xs text-slate-500">${escapeHtmlUtil(author.email)}</div>` : '';
+				const email = author.email ? `<div class="truncate text-xs text-slate-500" title="${escapeHtmlUtil(author.email)}">${escapeHtmlUtil(author.email)}</div>` : '';
 				const color = getPersonColor(author.key);
 				return `
 					<label class="flex cursor-pointer items-start gap-3 rounded-lg border-l-4 px-3 py-2 text-sm text-slate-900 transition hover:brightness-95" style="border-left-color:${color};background-color:color-mix(in srgb, ${color} 6%, white)">
