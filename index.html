@@ -202,6 +202,15 @@
 			</div>
 		</section>
 
+		<section id="projectSummarySection" class="mt-12 hidden rounded bg-white p-4 shadow sm:p-5">
+			<div class="flex items-center justify-between gap-3">
+				<h2 class="text-lg text-slate-900">Project Activity</h2>
+				<div id="projectSummary" class="text-sm text-slate-600"></div>
+			</div>
+			<div id="projectSummaryEmpty" class="mt-4 text-slate-700">Parse a dump to see project totals.</div>
+			<div id="projectSummaryBody" class="mt-4 hidden flex-wrap gap-6"></div>
+		</section>
+
 		<section class="mt-12 rounded bg-white shadow">
 			<div id="tableWrap" class="overflow-auto rounded border border-slate-200">
 				<table class="min-w-full divide-y divide-slate-200 text-left text-base">
@@ -323,6 +332,7 @@
 			`;
 			projectCards.insertBefore(card, addProjectButton);
 			updateRemoveButtons();
+			renderProjectSummary(lastProjectSummaryData);
 			return card;
 		}
 
@@ -391,6 +401,7 @@
 		const personColors = new Map();
 		let openColorPickerKey = null;
 		let lastAuthorSummaryData = [];
+		let lastProjectSummaryData = [];
 
 		function nextFreeColor() {
 			const taken = new Set(personColors.values());
@@ -740,6 +751,80 @@
 			emptyState.classList.add('hidden');
 		}
 
+		function renderProjectSummary(data) {
+			lastProjectSummaryData = data;
+			const section = document.getElementById('projectSummarySection');
+			const summary = document.getElementById('projectSummary');
+			const empty = document.getElementById('projectSummaryEmpty');
+			const body = document.getElementById('projectSummaryBody');
+			const multiple = getCardElements().length > 1;
+			section.classList.toggle('hidden', !multiple);
+			if (!multiple) {
+				return;
+			}
+
+			if (!data.length) {
+				summary.textContent = '';
+				body.innerHTML = '';
+				body.classList.add('hidden');
+				body.classList.remove('flex');
+				empty.classList.remove('hidden');
+				return;
+			}
+
+			const projectMap = new Map();
+			for (const commit of data) {
+				const files = Array.isArray(commit.files) ? commit.files : [];
+				const current = projectMap.get(commit.projectId) || {
+					id: commit.projectId, authors: new Set(), commits: 0, insertions: 0, deletions: 0, files: 0,
+				};
+				current.authors.add(getCommitAuthorKey(commit));
+				current.commits += 1;
+				current.insertions += files.reduce((sum, file) => sum + (file.insertions || 0), 0);
+				current.deletions += files.reduce((sum, file) => sum + (file.deletions || 0), 0);
+				current.files += files.length;
+				projectMap.set(commit.projectId, current);
+			}
+
+			const projects = Array.from(projectMap.values()).sort((a, b) => a.id - b.id);
+			const totalCommits = projects.reduce((sum, project) => sum + project.commits, 0);
+			const totalChanges = projects.reduce((sum, project) => sum + project.insertions + project.deletions, 0);
+			summary.textContent = `${projects.length} project${projects.length === 1 ? '' : 's'} across ${totalCommits} commit${totalCommits === 1 ? '' : 's'} and ${totalChanges} change${totalChanges === 1 ? '' : 's'}`;
+
+			body.innerHTML = projects.map((project) => `
+				<div class="flex-none rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
+					<div class="flex items-start justify-between gap-2">
+						<div>
+							<div class="font-semibold text-slate-900">${escapeHtmlUtil(getProjectName(project.id))}</div>
+							<div class="text-slate-500">${project.authors.size} author${project.authors.size === 1 ? '' : 's'}</div>
+						</div>
+						<div class="rounded-full bg-slate-200 px-2 py-0.5 font-semibold text-black/75">${project.commits} commit${project.commits === 1 ? '' : 's'}</div>
+					</div>
+					<div class="mt-2 grid grid-cols-2 gap-1.5">
+						<div class="rounded-lg bg-white px-2 py-1.5">
+							<div class="uppercase tracking-wide text-slate-500">Changes</div>
+							<div class="font-semibold text-slate-900">${project.insertions + project.deletions}</div>
+						</div>
+						<div class="rounded-lg bg-white px-2 py-1.5">
+							<div class="uppercase tracking-wide text-slate-500">Files</div>
+							<div class="font-semibold text-slate-900">${project.files}</div>
+						</div>
+						<div class="rounded-lg bg-emerald-50 px-2 py-1.5 text-emerald-700">
+							<div class="uppercase tracking-wide text-emerald-600">Insertions</div>
+							<div class="font-semibold">+${project.insertions}</div>
+						</div>
+						<div class="rounded-lg bg-rose-50 px-2 py-1.5 text-rose-700">
+							<div class="uppercase tracking-wide text-rose-600">Deletions</div>
+							<div class="font-semibold">-${project.deletions}</div>
+						</div>
+					</div>
+				</div>
+			`).join('');
+			empty.classList.add('hidden');
+			body.classList.remove('hidden');
+			body.classList.add('flex');
+		}
+
 		function renderAuthorSummary(data) {
 			lastAuthorSummaryData = data;
 			if (!data.length) {
@@ -903,6 +988,7 @@
 			renderContributionGraph(visibleCommits);
 			renderTimeline(visibleCommits);
 			renderAuthorSummary(visibleCommits);
+			renderProjectSummary(visibleCommits);
 		}
 
 		function parseDateParts(dateText) {
