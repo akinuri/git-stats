@@ -46,11 +46,6 @@
 						<label class="block text-sm text-slate-700" for="dumpFile">Upload dump file</label>
 						<input id="dumpFile" type="file" accept=".txt,.log,.dump,text/plain" class="block w-full rounded border border-slate-400 bg-white px-3 py-1.5 text-sm">
 					</div>
-
-					<div class="flex flex-wrap gap-2">
-						<button id="parseButton" class="rounded border border-slate-800 bg-slate-800 px-4 py-1.5 text-sm text-white hover:bg-slate-700">Parse dump</button>
-						<button id="clearButton" class="rounded border border-slate-400 bg-white px-4 py-1.5 text-sm hover:bg-slate-200">Clear</button>
-					</div>
 				</div>
 
 				<div class="space-y-1">
@@ -59,6 +54,11 @@
 				</div>
 			</div>
 		</section>
+
+		<div class="mt-4 flex flex-wrap gap-2">
+			<button id="parseButton" class="rounded border border-slate-800 bg-slate-800 px-4 py-1.5 text-sm text-white hover:bg-slate-700">Parse dump</button>
+			<button id="clearButton" class="rounded border border-slate-400 bg-white px-4 py-1.5 text-sm hover:bg-slate-200">Clear</button>
+		</div>
 
 		<section id="filtersCard" class="sticky top-4 z-30 mt-12 rounded bg-white p-4 shadow transition-shadow sm:p-5">
 			<div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
