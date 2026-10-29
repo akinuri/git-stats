@@ -145,17 +145,17 @@
 						<div class="grid grid-cols-[auto_1fr] grid-rows-[auto_auto] gap-x-2">
 							<div></div>
 							<div id="contributionMonths" class="mb-1 h-4 grid gap-x-1 pl-0.5 text-[11px] text-slate-500"></div>
-							<div class="grid grid-rows-8 auto-rows-[0.75rem] gap-1 text-[11px] leading-3 text-slate-500">
-								<div class="flex h-3 items-center">Mon</div>
-								<div class="flex h-3 items-center">Tue</div>
-								<div class="flex h-3 items-center">Wed</div>
-								<div class="flex h-3 items-center">Thu</div>
-								<div class="flex h-3 items-center">Fri</div>
-								<div class="flex h-3 items-center">Sat</div>
-								<div class="flex h-3 items-center">Sun</div>
-								<div class="text-[10px] text-slate-400"></div>
+							<div class="grid grid-rows-8 auto-rows-[1.25rem] gap-1 text-[11px] leading-3 text-slate-500">
+								<div class="flex h-5 items-center">Mon</div>
+								<div class="flex h-5 items-center">Tue</div>
+								<div class="flex h-5 items-center">Wed</div>
+								<div class="flex h-5 items-center">Thu</div>
+								<div class="flex h-5 items-center">Fri</div>
+								<div class="flex h-5 items-center">Sat</div>
+								<div class="flex h-5 items-center">Sun</div>
+								<div class="h-7 text-[10px] text-slate-400"></div>
 							</div>
-							<div id="contributionGrid" class="grid grid-rows-8 grid-flow-col auto-cols-max auto-rows-[0.75rem] gap-1"></div>
+							<div id="contributionGrid" class="grid grid-rows-8 grid-flow-col auto-cols-max auto-rows-[1.25rem] gap-1"></div>
 						</div>
 					</div>
 				</div>
@@ -1033,10 +1033,10 @@
 			const totalContributions = Array.from(dayCounts.values()).reduce((sum, count) => sum + count, 0);
 			contributionSummary.textContent = `${totalContributions} contribution${totalContributions === 1 ? '' : 's'} across ${dayCounts.size} day${dayCounts.size === 1 ? '' : 's'}`;
 
-			const weekColumnTemplate = `repeat(${totalWeeks}, 1rem)`;
+			const weekColumnTemplate = `repeat(${totalWeeks}, 1.25rem)`;
 			contributionMonths.style.gridTemplateColumns = weekColumnTemplate;
 			contributionGrid.style.gridTemplateColumns = weekColumnTemplate;
-			contributionGrid.style.gridTemplateRows = 'repeat(7, 1rem) 1.5rem';
+			contributionGrid.style.gridTemplateRows = 'repeat(7, 1.25rem) 1.75rem';
 
 			const monthStartColumns = new Map();
 			const monthTitles = new Map();
@@ -1089,14 +1089,14 @@
 						const dayKey = `${current.getUTCFullYear()}-${String(current.getUTCMonth() + 1).padStart(2, '0')}-${String(current.getUTCDate()).padStart(2, '0')}`;
 						const count = dayCounts.get(dayKey) || 0;
 						cells.push(
-							`<div class="h-4 w-4 rounded-sm border ${levelClass(count, maxCount)}" title="${count} contribution${count === 1 ? '' : 's'} on ${escapeHtmlUtil(formatDayLabel(dayKey))}"></div>`,
+							`<div class="h-5 w-5 rounded-sm border ${levelClass(count, maxCount)}" title="${count} contribution${count === 1 ? '' : 's'} on ${escapeHtmlUtil(formatDayLabel(dayKey))}"></div>`,
 						);
 					}
 					const weekTotal = weekTotals[weekIndex];
 					const weekRatio = maxWeekTotal > 0 ? weekTotal / maxWeekTotal : 0;
 					const weekTotalTextClass = weekRatio > 0.66 ? 'text-white' : 'text-slate-900';
 					cells.push(
-				`<div class="h-4 w-4 rounded-sm border flex items-center justify-center ${weekTotalTextClass} text-[10px] font-semibold ${levelClass(weekTotal, maxWeekTotal)}" style="margin-top: 0.5rem; opacity: 0.75;" title="${weekTotal} contribution${weekTotal === 1 ? '' : 's'} this week">${weekTotal}</div>`,
+				`<div class="h-5 w-5 rounded-sm border flex items-center justify-center ${weekTotalTextClass} text-[10px] font-semibold ${levelClass(weekTotal, maxWeekTotal)}" style="margin-top: 0.5rem; opacity: 0.75;" title="${weekTotal} contribution${weekTotal === 1 ? '' : 's'} this week">${weekTotal}</div>`,
 				);
 			}
 
